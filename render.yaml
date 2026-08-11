@@ -17,7 +17,7 @@ services:
     runtime: node
     plan: free
     region: oregon
-    branch: main
+    branch: claude/alamdin-ai-receptionist-2yshb7
     buildCommand: npm run render-build
     startCommand: npm run render-start
     healthCheckPath: /health
