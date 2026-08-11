@@ -1,5 +1,12 @@
 version: "3.9"
 
+# Runs the app against PostgreSQL (matching the Dockerfile, which now builds
+# against prisma/production/schema.prisma). Includes a local Postgres
+# container by default so `docker compose up --build` still works with zero
+# external setup. To point at a real hosted Postgres instead (e.g. Neon),
+# override DATABASE_URL: `DATABASE_URL="postgresql://..." docker compose up`
+# — the bundled `postgres` service is then simply unused.
+
 services:
   app:
     build: .
@@ -8,7 +15,7 @@ services:
     environment:
       NODE_ENV: production
       PORT: 3000
-      DATABASE_URL: "file:/data/prod.db"
+      DATABASE_URL: ${DATABASE_URL:-postgresql://alamdin:alamdin@postgres:5432/alamdin_receptionist}
       AI_PROVIDER: ${AI_PROVIDER:-template}
       AI_API_KEY: ${AI_API_KEY:-}
       AI_BASE_URL: ${AI_BASE_URL:-https://api.openai.com/v1}
@@ -18,27 +25,19 @@ services:
       RATE_LIMIT_WINDOW_MS: ${RATE_LIMIT_WINDOW_MS:-60000}
       RATE_LIMIT_MAX: ${RATE_LIMIT_MAX:-60}
       LOG_LEVEL: ${LOG_LEVEL:-info}
-    volumes:
-      - alamdin_db_data:/data
+    depends_on:
+      - postgres
     restart: unless-stopped
 
-  # --- Optional: PostgreSQL for a real production deployment ---------------
-  # 1. In prisma/schema.prisma, change datasource provider from "sqlite" to
-  #    "postgresql".
-  # 2. Uncomment this service and set DATABASE_URL above to:
-  #    postgresql://alamdin:alamdin@postgres:5432/alamdin_receptionist
-  # 3. Run `docker compose up --build`.
-  #
-  # postgres:
-  #   image: postgres:16-alpine
-  #   environment:
-  #     POSTGRES_USER: alamdin
-  #     POSTGRES_PASSWORD: alamdin
-  #     POSTGRES_DB: alamdin_receptionist
-  #   volumes:
-  #     - alamdin_postgres_data:/var/lib/postgresql/data
-  #   restart: unless-stopped
+  postgres:
+    image: postgres:16-alpine
+    environment:
+      POSTGRES_USER: alamdin
+      POSTGRES_PASSWORD: alamdin
+      POSTGRES_DB: alamdin_receptionist
+    volumes:
+      - alamdin_postgres_data:/var/lib/postgresql/data
+    restart: unless-stopped
 
 volumes:
-  alamdin_db_data:
-  # alamdin_postgres_data:
+  alamdin_postgres_data:
