@@ -1,0 +1,113 @@
+// Alamdin AI Receptionist — database schema
+//
+// Default datasource is SQLite so the project runs out of the box with zero
+// external services (npm install && npm run dev just works). For production,
+// switch the provider below to "postgresql" and point DATABASE_URL at a real
+// Postgres instance, then run `npm run prisma:deploy`. No application code
+// needs to change — Prisma Client's API is identical across both providers.
+//
+// See README.md → "Switching to PostgreSQL for production".
+
+generator client {
+  provider = "prisma-client-js"
+}
+
+datasource db {
+  provider = "sqlite" // change to "postgresql" for production
+  url      = env("DATABASE_URL")
+}
+
+/// One chat session with a single patient, across one channel (web today,
+/// WhatsApp/voice later). Holds both the running appointment-collection
+/// state and the free-form conversation history.
+model Conversation {
+  id        String   @id @default(cuid())
+  channel   String   @default("web") // web | whatsapp (future) | voice (future)
+
+  /// Detected language of the most recent patient message.
+  language  String   @default("english") // english | urdu | roman-urdu
+
+  /// Appointment intake state machine stage. See src/types/conversation.ts.
+  stage     String   @default("IDLE")
+
+  /// Fields collected one-at-a-time during an appointment request.
+  patientName     String?
+  phone           String?
+  reason          String?
+  preferredDateRaw   String?
+  preferredDateISO   String?
+  preferredTimeRaw   String?
+  preferredTimeNormalized String?
+
+  /// NOT_APPLICABLE | PENDING | REQUESTED — mirrors AppointmentRequest.status
+  /// for the *current* in-flight request only.
+  confirmationStatus String @default("NOT_APPLICABLE")
+
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  messages             Message[]
+  appointmentRequests  AppointmentRequest[]
+
+  @@index([updatedAt])
+}
+
+/// Full transcript, stored for audit/debugging and future analytics.
+model Message {
+  id             String   @id @default(cuid())
+  conversationId String
+  conversation   Conversation @relation(fields: [conversationId], references: [id], onDelete: Cascade)
+
+  role      String   // user | assistant | system
+  content   String
+
+  createdAt DateTime @default(now())
+
+  @@index([conversationId, createdAt])
+}
+
+/// A patient-submitted appointment REQUEST. This is explicitly not a
+/// confirmed appointment — clinic staff confirm availability by phone.
+model AppointmentRequest {
+  id             String   @id @default(cuid())
+  conversationId String
+  conversation   Conversation @relation(fields: [conversationId], references: [id], onDelete: Cascade)
+
+  patientName String
+  phone       String
+  reason      String
+
+  preferredDateRaw String
+  preferredDateISO String
+  preferredTimeRaw String
+  preferredTimeNormalized String
+
+  /// NEW | PENDING_CONFIRMATION | CONFIRMED_BY_CLINIC | CANCELLED | COMPLETED
+  /// The AI engine only ever writes NEW. Every other transition is a manual
+  /// staff action via POST /api/v1/appointments/:id/status.
+  status String @default("NEW")
+
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  @@index([status])
+  @@index([createdAt])
+}
+
+// ---------------------------------------------------------------------------
+// Future extension points (deliberately NOT modeled yet, per project scope):
+//
+//   Patient      — a durable identity across conversations/channels
+//   Doctor       — multi-doctor support beyond Dr. Alamdin
+//   Clinic       — multi-location support
+//   Availability — real bookable time slots (would replace "requests" with
+//                  true confirmed Appointment scheduling)
+//   Appointment  — a confirmed, slot-backed booking distinct from a request
+//   Lead         — pre-appointment marketing/intake funnel tracking
+//   FollowUp     — post-visit follow-up / recall reminders
+//
+// AppointmentRequest.conversationId and the Conversation model are shaped so
+// these can be layered on later (e.g. AppointmentRequest gaining an optional
+// patientId, or a status transition into a real Appointment row) without a
+// breaking rewrite of the receptionist engine.
+// ---------------------------------------------------------------------------
