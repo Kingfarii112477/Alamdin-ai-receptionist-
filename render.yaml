@@ -1,0 +1,52 @@
+# Render Blueprint — deploys the Alamdin AI Receptionist as a single free
+# Web Service (Express serves both the JSON API and the static web/public
+# chat + admin UI, exactly as it does locally — no architecture change).
+#
+# Database: NOT provisioned here. Render's own free Postgres expires after
+# 30 days; use a permanent free Postgres instead (e.g. Neon, neon.tech) and
+# paste its connection string into DATABASE_URL below after import — see
+# README.md → "Deploying to Render (free tier) with Neon Postgres".
+#
+# To use: Render dashboard → New → Blueprint → point at this repo. Render
+# reads this file and creates the service below. Nothing is deployed by
+# committing this file — it only takes effect when you run the Blueprint.
+
+services:
+  - type: web
+    name: alamdin-ai-receptionist
+    runtime: node
+    plan: free
+    region: oregon
+    branch: main
+    buildCommand: npm run render-build
+    startCommand: npm run render-start
+    healthCheckPath: /health
+    envVars:
+      - key: NODE_ENV
+        value: production
+      # Paste your Neon (or other) PostgreSQL connection string here after
+      # creating the Blueprint — see README for how to get one for free.
+      - key: DATABASE_URL
+        sync: false
+      # AI provider abstraction — leave AI_API_KEY blank to run fully
+      # offline on the built-in template provider (no cost, no key needed).
+      - key: AI_PROVIDER
+        value: template
+      - key: AI_API_KEY
+        sync: false
+      - key: AI_BASE_URL
+        value: https://api.openai.com/v1
+      - key: AI_MODEL
+        value: gpt-4o-mini
+      - key: CORS_ORIGIN
+        value: "*"
+      - key: RATE_LIMIT_WINDOW_MS
+        value: "60000"
+      - key: RATE_LIMIT_MAX
+        value: "60"
+      # Required — set a strong secret before going live. Protects the
+      # admin dashboard and appointment-listing/status-update endpoints.
+      - key: ADMIN_API_KEY
+        sync: false
+      - key: LOG_LEVEL
+        value: info

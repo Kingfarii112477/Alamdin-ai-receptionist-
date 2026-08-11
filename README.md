@@ -152,6 +152,8 @@ Appointment statuses: `NEW → PENDING_CONFIRMATION → CONFIRMED_BY_CLINIC` (or
 
 No application code changes are needed — Prisma Client's API is identical across both providers.
 
+> **Deploying to a host with no persistent disk** (e.g. Render's free web service)? Don't edit `prisma/schema.prisma` directly — use the ready-made `prisma/production/schema.prisma` + `prisma/production/migrations/` instead, which already targets PostgreSQL and ships in this repo. It's a separate schema file specifically so your local SQLite dev setup above is never touched. See the next section.
+
 ## Deployment (Docker)
 
 ```bash
@@ -161,6 +163,27 @@ docker compose up --build
 This builds the app, runs pending Prisma migrations automatically on boot, and serves on port 3000 with a persisted SQLite volume. Configure via a `.env` file or environment variables passed to `docker compose` (see the table above — `AI_API_KEY`, `ADMIN_API_KEY`, etc.). `docker-compose.yml` includes a commented-out Postgres service for a full production setup — see the comments in that file.
 
 Without Docker: `npm run build`, ship the `dist/`, `prisma/`, `web/`, and `node_modules/` (or `package.json` + `npm ci --omit=dev`) directories to any Node 18+ host, set env vars, run `npx prisma migrate deploy && npm start`.
+
+## Deploying to Render (free tier) with Neon Postgres
+
+The simplest **free** way to put this online: [Render](https://render.com) hosts the one Express app (API + web chat + admin dashboard, unchanged — no split frontend/backend) as a free Web Service, and [Neon](https://neon.tech) provides a permanently-free PostgreSQL database (Render's own free Postgres expires after 30 days, so Neon is used instead for real persistence). Neither requires a credit card.
+
+This repo ships everything needed for this:
+
+- `prisma/production/schema.prisma` + `prisma/production/migrations/` — a PostgreSQL-flavored copy of the schema, kept in its own directory so local `npm run dev` / `npm test` keep using SQLite untouched.
+- `package.json` → `render-build` / `render-start` scripts that generate/migrate against that production schema.
+- `render.yaml` — a Render Blueprint that provisions the service with the right build/start commands and env var slots.
+
+**Steps:**
+
+1. **Create the free database.** Sign up at [neon.tech](https://neon.tech), create a project, and copy its connection string (starts with `postgresql://...`, include `?sslmode=require`).
+2. **Push this repo to GitHub** (Render deploys from a Git repo).
+3. **Render dashboard → New → Blueprint**, select this repo. Render reads `render.yaml` and proposes one service, `alamdin-ai-receptionist`, on the free plan.
+4. Before/after creating it, fill in the env vars marked `sync: false` in `render.yaml` (Render will prompt for these in the UI): `DATABASE_URL` (the Neon string from step 1), `ADMIN_API_KEY` (a strong secret you choose), and optionally `AI_API_KEY` if you want real-LLM FAQ answers instead of the offline template provider.
+5. Click **Apply**. Render runs `npm run render-build` (installs deps, generates the Postgres Prisma Client, compiles TypeScript), then on boot runs `npm run render-start` (`prisma migrate deploy` against `prisma/production/schema.prisma`, then `npm start`).
+6. Your app is live at `https://alamdin-ai-receptionist.onrender.com` (or whatever name you gave it) — chat UI at `/`, admin dashboard at `/admin.html`, API under `/api/v1/*`.
+
+No manual deploy has been triggered as part of preparing these files — the steps above are yours to run whenever you're ready.
 
 ## Tests
 
