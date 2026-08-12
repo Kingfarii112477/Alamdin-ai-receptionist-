@@ -164,26 +164,26 @@ The `Dockerfile` builds against **PostgreSQL** (`prisma/production/migrations/`)
 
 Without Docker: `npm run build`, ship the `dist/`, `prisma/`, `web/`, and `node_modules/` (or `package.json` + `npm ci --omit=dev`) directories to any Node 18+ host, set env vars (with a Postgres `DATABASE_URL`), run `npm run prisma:deploy:prod && npm start`.
 
-## Deploying to Netlify (free tier, serverless — current recommendation)
+## Deploying to Netlify (free tier, serverless — live and verified)
 
-[Netlify](https://netlify.com)'s free tier is confirmed no-credit-card, and hosts this app as a serverless function (like Vercel below) rather than a persistent container. Static assets (chat UI, admin dashboard) are served directly by Netlify's CDN; `/health` and `/api/v1/*` are handled by a single Netlify Function wrapping the existing Express app — **`src/` is completely unchanged**. This repo already has everything needed:
+[Netlify](https://netlify.com)'s free tier is confirmed no-credit-card, and hosts this app as a serverless function rather than a persistent container. Static assets (chat UI, admin dashboard) are served directly by Netlify's CDN; `/health` and `/api/v1/*` are handled by a single Netlify Function wrapping the existing Express app — **`src/` is completely unchanged**. **This has been deployed and fully verified live** (health check, the complete multi-turn appointment conversation against the real Neon database, and the admin dashboard all confirmed working end-to-end).
 
 - `netlify/functions/api.ts` — wraps the same `createApp()` used everywhere else with `serverless-http`. No route logic duplicated or rewritten.
-- `netlify.toml` — `publish = "public"` (a copy of `web/public/`, same reasoning as Vercel below), a build command that generates the Postgres Prisma Client and runs `prisma migrate deploy` against `prisma/production/schema.prisma`, and redirects mapping `/health` and `/api/*` to the function while preserving the original path (`/api/v1/chat` reaches the function as `/api/v1/chat`, matching `app.use("/api/v1", ...)` unchanged).
-
-Verified locally with the actual Netlify CLI (`netlify dev`) emulating the redirects and function: both `/health` and `POST /api/v1/chat` were confirmed reaching the Express app and returning `200` correctly. (The local CLI itself has a known, reported worker-thread bug — [netlify/cli#2244](https://github.com/netlify/cli/issues/2244) and similar — that kills the dev process right after each successful response; this is a local-tooling issue, not an application bug, and doesn't reflect how the real deployed Netlify Function behaves.)
-
-Two real bugs were found and fixed while testing this path — both apply to **every** proxied/serverless deploy target, not just Netlify:
-- `app.set("trust proxy", 1)` added to `src/app.ts` — without it, `express-rate-limit` refuses to start behind any reverse proxy that sets `X-Forwarded-For` (which every host here does).
-- `src/middleware/rateLimiter.ts` now has a defensive `keyGenerator` that falls back to parsing `X-Forwarded-For` directly (and finally a shared bucket) instead of crashing when `req.ip` is undefined, which some serverless runtimes don't always populate.
+- `netlify.toml` — `publish = "public"` (a copy of `web/public/`), a build command that generates the Postgres Prisma Client and runs `prisma migrate deploy` against `prisma/production/schema.prisma`, and redirects mapping `/health` and `/api/*` to the function while preserving the original path (`/api/v1/chat` reaches the function as `/api/v1/chat`, matching `app.use("/api/v1", ...)` unchanged).
 
 **Steps:**
 
 1. Have your Neon `DATABASE_URL` ready.
-2. **[app.netlify.com](https://app.netlify.com) → Add new site → Import an existing project**, authorize GitHub, select `Kingfarii112477/Alamdin-ai-receptionist-`, branch `claude/alamdin-ai-receptionist-2yshb7`. Netlify reads `netlify.toml` automatically — no build settings to configure by hand.
-3. **Site configuration → Environment variables** → add `DATABASE_URL`, `ADMIN_API_KEY`, `NODE_ENV=production`, and optionally `AI_API_KEY` (leave blank for the offline template provider). Make sure they're available to the build (migrations run during the build step).
+2. **[app.netlify.com](https://app.netlify.com) → Add new site → Import an existing project**, authorize GitHub, select your repo/branch. Netlify reads `netlify.toml` automatically — no build settings to configure by hand.
+3. **Site configuration → Environment variables** → add `DATABASE_URL`, `ADMIN_API_KEY`, `NODE_ENV=production`, and optionally `AI_API_KEY` (leave blank for the offline template provider).
+   - **Important:** add these as **non-secret** values (do not tick "secret"/"sensitive"). Netlify deliberately excludes secret-marked variables from the build step (so they never leak into build logs) — but this app's build step needs `DATABASE_URL` to run its migration, and the deployed function needs `ADMIN_API_KEY` at runtime. Marking either as secret silently breaks that specific step with no obvious error (the build fails with a generic "Environment variable not found" and, separately, the admin endpoints 401 even with the correct key). Set scope to all of Builds/Functions/Runtime/Post-processing.
 4. Click **Deploy**.
 5. Your app is live at the `*.netlify.app` URL Netlify assigns — chat UI at `/`, admin dashboard at `/admin.html`, API under `/api/v1/*`.
+
+**Real bugs found and fixed while deploying this** (all fixed in this repo — nothing left for a fresh deploy to hit):
+- `app.set("trust proxy", 1)` added to `src/app.ts` — without it, `express-rate-limit` refuses to start behind any reverse proxy that sets `X-Forwarded-For` (which every host here does).
+- `src/middleware/rateLimiter.ts` has a defensive `keyGenerator` that falls back to parsing `X-Forwarded-For` directly (and finally a shared bucket) instead of crashing when `req.ip` is undefined, which some serverless runtimes don't always populate.
+- `src/utils/logger.ts` no longer uses pino's string-based `transport: { target: "pino-pretty" }` (which spawns a worker thread that resolves the module by name at runtime — this breaks under any bundler, since the bundled function file has no `node_modules` path for the worker to find). Switched to pino-pretty's direct synchronous stream API instead, which is bundler-safe. `pino-pretty` moved from `devDependencies` to `dependencies` accordingly.
 
 ## Deploying to Zeabur — no longer viable (kept for reference)
 
