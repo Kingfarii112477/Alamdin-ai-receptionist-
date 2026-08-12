@@ -17,10 +17,29 @@
 
     <div class="app-shell">
       <header class="brand-header">
-        <div class="brand-mark">A</div>
+        <div class="brand-avatar" aria-hidden="true">
+          <svg width="30" height="30" viewBox="0 0 24 24" fill="none">
+            <path
+              d="M12 2C8.5 2 6 4 6 7.2c0 2.2.6 3.3 1 5.3.4 2 .6 5 1.4 7.6.3 1 .8 1.9 1.7 1.9.9 0 1.1-.8 1.3-1.9.3-1.6.4-3.3.6-3.3s.3 1.7.6 3.3c.2 1.1.4 1.9 1.3 1.9.9 0 1.4-.9 1.7-1.9.8-2.6 1-5.6 1.4-7.6.4-2 1-3.1 1-5.3C18 4 15.5 2 12 2Z"
+              fill="url(#toothGrad)"
+            />
+            <defs>
+              <linearGradient id="toothGrad" x1="6" y1="2" x2="18" y2="22" gradientUnits="userSpaceOnUse">
+                <stop offset="0" stop-color="#ffffff" />
+                <stop offset="1" stop-color="#e6e9ff" />
+              </linearGradient>
+            </defs>
+          </svg>
+        </div>
         <div class="brand-copy">
-          <h1>Dr. Alamdin Microscopic Dental Clinic &amp; Implant Center</h1>
-          <p>AI Receptionist · Quetta</p>
+          <h1>Alamdin <span class="brand-highlight">AI</span> Receptionist</h1>
+          <p>
+            Your Dental Concierge
+            <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round" class="verified-badge">
+              <path d="m9 12 2 2 4-4" />
+              <path d="M12 2 4 5v6c0 5 3.4 8.4 8 11 4.6-2.6 8-6 8-11V5Z" />
+            </svg>
+          </p>
         </div>
         <div class="header-actions">
           <button class="icon-btn" id="soundBtn" title="Toggle sound effects" aria-label="Toggle sound effects">
@@ -46,24 +65,117 @@
 
       <main class="chat-scroll" id="chatScroll">
         <div class="empty-state" id="emptyState">
+          <div class="tooth-hero" aria-hidden="true">
+            <svg class="tooth-hero-orbit" width="220" height="220" viewBox="0 0 220 220">
+              <ellipse cx="110" cy="110" rx="95" ry="30" fill="none" stroke="url(#orbitGrad)" stroke-width="1.5" />
+              <defs>
+                <linearGradient id="orbitGrad" x1="0" y1="0" x2="220" y2="0" gradientUnits="userSpaceOnUse">
+                  <stop offset="0" stop-color="var(--accent)" stop-opacity="0" />
+                  <stop offset="0.5" stop-color="var(--neon-cyan)" stop-opacity="0.9" />
+                  <stop offset="1" stop-color="var(--accent)" stop-opacity="0" />
+                </linearGradient>
+              </defs>
+            </svg>
+            <svg class="tooth-hero-glow" width="120" height="140" viewBox="0 0 120 140" fill="none">
+              <path
+                d="M60 6C36 6 20 20 20 40c0 12 3 18 5.5 29 2.5 11 3.5 27 8 41 1.8 5.6 4.6 10.4 9.5 10.4 5 0 6-4.6 7-10.4 1.6-9 2-18 10-18s8.4 9 10 18c1 5.8 2 10.4 7 10.4 4.9 0 7.7-4.8 9.5-10.4 4.5-14 5.5-30 8-41C97 58 100 52 100 40 100 20 84 6 60 6Z"
+                fill="url(#toothHeroGrad)"
+              />
+              <defs>
+                <linearGradient id="toothHeroGrad" x1="20" y1="6" x2="100" y2="134" gradientUnits="userSpaceOnUse">
+                  <stop offset="0" stop-color="#ffffff" />
+                  <stop offset="1" stop-color="#dbe3ff" />
+                </linearGradient>
+              </defs>
+            </svg>
+            <span class="sparkle s1"></span>
+            <span class="sparkle s2"></span>
+            <span class="sparkle s3"></span>
+          </div>
+
           <h2>Assalam-o-Alaikum 👋</h2>
           <p>
             Ask about clinic timings, fees, location — or book an appointment request.<br />
             Aap Urdu, Roman Urdu, ya English mein baat kar sakte hain.
           </p>
-          <div class="suggestion-chips">
-            <button class="chip" data-msg="Mujhe appointment book karni hai">Book an appointment</button>
-            <button class="chip" data-msg="Consultation fee kitni hai?">Consultation fee</button>
-            <button class="chip" data-msg="Clinic ke timings kya hain?">Clinic timings</button>
-            <button class="chip" data-msg="Clinic ka address kya hai?">Location</button>
+
+          <div class="promo-card">
+            <div class="promo-icon">
+              <svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+                <path
+                  d="M12 2C8.5 2 6 4 6 7.2c0 2.2.6 3.3 1 5.3.4 2 .6 5 1.4 7.6.3 1 .8 1.9 1.7 1.9.9 0 1.1-.8 1.3-1.9.3-1.6.4-3.3.6-3.3s.3 1.7.6 3.3c.2 1.1.4 1.9 1.3 1.9.9 0 1.4-.9 1.7-1.9.8-2.6 1-5.6 1.4-7.6.4-2 1-3.1 1-5.3C18 4 15.5 2 12 2Z"
+                />
+              </svg>
+            </div>
+            <div class="promo-text">
+              <span class="promo-eyebrow">We care for</span>
+              <strong>Your Smile</strong>
+              <span class="promo-sub">Healthy smile, confident you.</span>
+            </div>
+            <div class="promo-heart" aria-hidden="true">
+              <svg width="16" height="16" viewBox="0 0 24 24" fill="currentColor">
+                <path d="M12 21s-6.7-4.35-9.3-8.1C.8 9.9 1.6 6.4 4.6 5c2.2-1 4.6-.2 6 1.6C12 4.8 14.4 4 16.6 5c3 1.4 3.8 4.9 1.9 7.9C18.7 16.65 12 21 12 21Z" />
+              </svg>
+            </div>
+          </div>
+
+          <div class="quick-actions">
+            <button class="quick-card" data-msg="Mujhe appointment book karni hai">
+              <span class="quick-icon qi-pink">
+                <svg width="19" height="19" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+                  <rect x="3" y="4" width="18" height="18" rx="3" />
+                  <path d="M16 2v4M8 2v4M3 10h18" />
+                </svg>
+              </span>
+              Book Appointment
+            </button>
+            <button class="quick-card" data-msg="Clinic ka address kya hai?">
+              <span class="quick-icon qi-cyan">
+                <svg width="19" height="19" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+                  <path d="M20 10c0 6-8 12-8 12s-8-6-8-12a8 8 0 0 1 16 0Z" />
+                  <circle cx="12" cy="10" r="3" />
+                </svg>
+              </span>
+              Clinic Location
+            </button>
+            <button class="quick-card" data-msg="Aap konsi dental services offer karte hain?">
+              <span class="quick-icon qi-blue">
+                <svg width="19" height="19" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+                  <path d="M12 3C8.5 3 6 5 6 8c0 2 .6 3 1 4.8.4 1.8.6 4.5 1.4 6.8.3 1 .8 1.7 1.7 1.7.9 0 1.1-.7 1.3-1.7.3-1.4.4-3 .6-3s.3 1.6.6 3c.2 1 .4 1.7 1.3 1.7.9 0 1.4-.7 1.7-1.7.8-2.3 1-5 1.4-6.8C17.4 11 18 10 18 8c0-3-2.5-5-6-5Z" />
+                </svg>
+              </span>
+              Our Services
+            </button>
+            <button class="quick-card" data-msg="Mujhe kuch dental care tips dein">
+              <span class="quick-icon qi-purple">
+                <svg width="19" height="19" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+                  <path d="M9 18h6M10 22h4M15.5 14a4.5 4.5 0 1 0-7 0c.7.9 1.3 1.4 1.5 2.5h5c.2-1.1.8-1.6 1.5-2.5Z" />
+                </svg>
+              </span>
+              Dental Tips
+            </button>
           </div>
         </div>
       </main>
 
-      <div class="disclaimer">This assistant does not diagnose or prescribe. Appointment requests are confirmed by our staff by phone.</div>
+      <div class="disclaimer">
+        <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round">
+          <path d="m9 12 2 2 4-4" />
+          <path d="M12 2 4 5v6c0 5 3.4 8.4 8 11 4.6-2.6 8-6 8-11V5Z" />
+        </svg>
+        This assistant does not diagnose or prescribe. Appointment requests are confirmed by our staff by phone.
+      </div>
 
       <form class="composer" id="composerForm">
-        <textarea id="messageInput" placeholder="Type a message… (English, Urdu, or Roman Urdu)" rows="1" autocomplete="off"></textarea>
+        <div class="composer-field">
+          <textarea id="messageInput" placeholder="Type a message… (English, Urdu, or Roman Urdu)" rows="1" autocomplete="off"></textarea>
+          <button type="button" class="mic-btn" id="micBtn" title="Speak your message" aria-label="Speak your message" hidden>
+            <svg width="17" height="17" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+              <path d="M12 2a3 3 0 0 0-3 3v6a3 3 0 0 0 6 0V5a3 3 0 0 0-3-3Z" />
+              <path d="M19 10v1a7 7 0 0 1-14 0v-1M12 18v4M8 22h8" />
+            </svg>
+          </button>
+        </div>
         <button type="submit" class="send-btn" id="sendBtn" aria-label="Send">
           <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
             <path d="M22 2 11 13" />

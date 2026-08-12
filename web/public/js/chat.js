@@ -11,10 +11,12 @@
   const soundBtn = document.getElementById("soundBtn");
   const soundOnIcon = document.getElementById("soundOnIcon");
   const soundOffIcon = document.getElementById("soundOffIcon");
+  const micBtn = document.getElementById("micBtn");
 
   let conversationId = localStorage.getItem(STORAGE_KEY) || null;
   let busy = false;
   let soundEnabled = localStorage.getItem(SOUND_KEY) !== "off";
+  let lastRenderedDateKey = null;
 
   const SUMMARY_MARKERS = ["Appointment Request", "اپائنٹمنٹ کی درخواست"];
   const RECEIVED_MARKERS = ["request has been received", "درخواست موصول ہو گئی ہے", "request receive ho gayi"];
@@ -93,15 +95,46 @@
     chatScroll.scrollTop = chatScroll.scrollHeight;
   }
 
-  function appendMessage(role, content, { silent = false } = {}) {
+  function dateKey(d) {
+    return `${d.getFullYear()}-${d.getMonth()}-${d.getDate()}`;
+  }
+
+  function maybeInsertDateSeparator(when) {
+    const key = dateKey(when);
+    if (key === lastRenderedDateKey) return;
+    lastRenderedDateKey = key;
+
+    const today = new Date();
+    const yesterday = new Date();
+    yesterday.setDate(today.getDate() - 1);
+
+    let label = when.toLocaleDateString([], { day: "numeric", month: "short", year: "numeric" });
+    if (key === dateKey(today)) label = "Today";
+    else if (key === dateKey(yesterday)) label = "Yesterday";
+
+    const sep = document.createElement("div");
+    sep.className = "date-sep";
+    sep.textContent = label;
+    chatScroll.appendChild(sep);
+  }
+
+  function formatTime(when) {
+    return when.toLocaleTimeString([], { hour: "numeric", minute: "2-digit" });
+  }
+
+  function appendMessage(role, content, { silent = false, when = new Date() } = {}) {
     hideEmptyState();
+    maybeInsertDateSeparator(when);
 
     const row = document.createElement("div");
     row.className = `msg-row ${role}`;
 
     const avatar = document.createElement("div");
     avatar.className = "msg-avatar";
-    avatar.textContent = role === "user" ? "You" : "A";
+    avatar.textContent = "A";
+
+    const col = document.createElement("div");
+    col.className = "msg-col";
 
     const bubble = document.createElement("div");
     bubble.className = "bubble";
@@ -116,8 +149,27 @@
       bubble.classList.add("summary-card");
     }
 
+    const meta = document.createElement("div");
+    meta.className = "msg-meta";
+    const time = document.createElement("span");
+    time.textContent = formatTime(when);
+    meta.appendChild(time);
+
+    if (role === "user") {
+      meta.insertAdjacentHTML(
+        "beforeend",
+        `<svg class="read-receipt" width="14" height="10" viewBox="0 0 16 11" fill="none" stroke="currentColor" stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round"><path d="M1 5.5 4.5 9 11 1.5"/><path d="M5.5 5.5 9 9 15.5 1.5"/></svg>`
+      );
+    } else {
+      const dot = document.createElement("span");
+      dot.className = "status-dot";
+      meta.appendChild(dot);
+    }
+
+    col.appendChild(bubble);
+    col.appendChild(meta);
     row.appendChild(avatar);
-    row.appendChild(bubble);
+    row.appendChild(col);
     chatScroll.appendChild(row);
 
     if (received) {
@@ -169,7 +221,7 @@
       if (data.messages && data.messages.length) {
         for (const m of data.messages) {
           if (m.role === "user" || m.role === "assistant") {
-            appendMessage(m.role, m.content, { silent: true });
+            appendMessage(m.role, m.content, { silent: true, when: m.createdAt ? new Date(m.createdAt) : new Date() });
           }
         }
       }
@@ -233,21 +285,68 @@
     input.style.height = `${Math.min(input.scrollHeight, 120)}px`;
   });
 
-  document.querySelectorAll(".chip").forEach((chip) => {
-    chip.addEventListener("click", () => {
-      if (busy) return;
-      const msg = chip.getAttribute("data-msg");
-      sendMessage(msg);
+  function bindQuickTriggers(selector) {
+    document.querySelectorAll(selector).forEach((el) => {
+      el.addEventListener("click", () => {
+        if (busy) return;
+        const msg = el.getAttribute("data-msg");
+        if (msg) sendMessage(msg);
+      });
     });
-  });
+  }
+  bindQuickTriggers(".quick-card");
+  bindQuickTriggers(".chip");
 
   resetBtn.addEventListener("click", () => {
     localStorage.removeItem(STORAGE_KEY);
     conversationId = null;
+    lastRenderedDateKey = null;
     chatScroll.innerHTML = "";
     chatScroll.appendChild(emptyState);
     emptyState.style.display = "block";
   });
+
+  // ---------- Optional voice input (browser dictation, feature-detected) ----------
+
+  const SpeechRecognition = window.SpeechRecognition || window.webkitSpeechRecognition;
+  if (SpeechRecognition && micBtn) {
+    micBtn.hidden = false;
+    const recognition = new SpeechRecognition();
+    recognition.continuous = false;
+    recognition.interimResults = false;
+    let listening = false;
+
+    recognition.addEventListener("result", (e) => {
+      const transcript = e.results[0]?.[0]?.transcript;
+      if (transcript) {
+        input.value = input.value ? `${input.value} ${transcript}` : transcript;
+        input.dispatchEvent(new Event("input"));
+      }
+    });
+    recognition.addEventListener("end", () => {
+      listening = false;
+      micBtn.classList.remove("listening");
+    });
+    recognition.addEventListener("error", () => {
+      listening = false;
+      micBtn.classList.remove("listening");
+    });
+
+    micBtn.addEventListener("click", () => {
+      if (busy) return;
+      if (listening) {
+        recognition.stop();
+        return;
+      }
+      try {
+        recognition.start();
+        listening = true;
+        micBtn.classList.add("listening");
+      } catch {
+        listening = false;
+      }
+    });
+  }
 
   loadExistingConversation();
 })();
