@@ -164,22 +164,25 @@ The `Dockerfile` builds against **PostgreSQL** (`prisma/production/migrations/`)
 
 Without Docker: `npm run build`, ship the `dist/`, `prisma/`, `web/`, and `node_modules/` (or `package.json` + `npm ci --omit=dev`) directories to any Node 18+ host, set env vars (with a Postgres `DATABASE_URL`), run `npm run prisma:deploy:prod && npm start`.
 
-## Deploying to Back4App Containers (free tier)
+## Deploying to Zeabur (free tier)
 
-**Recommended free option.** [Back4App Containers](https://www.back4app.com/pricing/container-as-a-service) runs the `Dockerfile` above as a free container (no credit card required) and [Neon](https://neon.tech) provides the permanently-free PostgreSQL database. (Render was tried first — see below — but its Blueprint flow currently prompts for a paid plan, so this is the current recommended path.)
+**Recommended free option.** [Zeabur](https://zeabur.com) builds and runs the `Dockerfile` above directly (no credit card required) and [Neon](https://neon.tech) provides the permanently-free PostgreSQL database. (Render and Back4App were tried first — see below — but hit a Blueprint paywall and a GitHub-connection error respectively; Zeabur is the current recommended path.)
 
 **Steps:**
 
 1. **Create the free database** at [neon.tech](https://neon.tech) if you haven't already — copy the `postgresql://...?sslmode=require` connection string.
 2. Push this repo to GitHub (already done for this project).
-3. **Back4App dashboard → New App → Containers as a Service**, connect your GitHub account (one-time authorization), and select this repo/branch. Back4App detects the root `Dockerfile` automatically.
-4. Set the environment variables when prompted (names must be uppercase and start with a letter/underscore): `DATABASE_URL` (the Neon string), `ADMIN_API_KEY` (a strong secret), `NODE_ENV=production`, and optionally `AI_API_KEY` if you want real-LLM FAQ answers instead of the offline template provider (leave blank otherwise).
-5. Click **Create App** / **Deploy**. Back4App builds the image and runs the container's `CMD`, which applies pending Postgres migrations (`prisma migrate deploy --schema=prisma/production/schema.prisma`) and then starts the server.
-6. Your app is live at the URL Back4App assigns — chat UI at `/`, admin dashboard at `/admin.html`, API under `/api/v1/*`.
+3. **Zeabur dashboard → Create Project → Deploy New Service → GitHub**, authorize/install the Zeabur GitHub App (one-time), then select the `Kingfarii112477/Alamdin-ai-receptionist-` repo and the `claude/alamdin-ai-receptionist-2yshb7` branch. Zeabur detects the root `Dockerfile` automatically and builds from it.
+4. Open the new service → **Variables** tab and add: `DATABASE_URL` (the Neon string), `ADMIN_API_KEY` (a strong secret), `NODE_ENV=production`, and optionally `AI_API_KEY` if you want real-LLM FAQ answers instead of the offline template provider (leave blank otherwise).
+5. Zeabur builds and deploys automatically. It runs the container's `CMD`, which applies pending Postgres migrations (`prisma migrate deploy --schema=prisma/production/schema.prisma`) and then starts the server.
+6. Go to the service's **Domains** tab and click **Generate Domain** to get a free public `*.zeabur.app` HTTPS URL — chat UI at `/`, admin dashboard at `/admin.html`, API under `/api/v1/*`.
 
-## Deploying to Render (free tier, alternative)
+Note: Zeabur's free plan sleeps a service after a period of inactivity, waking on the next request with a few seconds of cold-start delay — the same tradeoff as Render's/Back4App's free tiers.
 
-[Render](https://render.com) is prepared as an alternative — same idea (one free Web Service, no split frontend/backend) — via `render.yaml` (a Render Blueprint) and the `render-build`/`render-start` npm scripts. As of this writing, Render's Blueprint flow may prompt for a paid plan; try Back4App above first, or create a plain free **Web Service** on Render manually (New → Web Service → this repo/branch → Build Command `npm run render-build` → Start Command `npm run render-start`) instead of using the Blueprint UI, then set the same `DATABASE_URL` / `ADMIN_API_KEY` / `AI_API_KEY` env vars by hand.
+## Other free options tried (kept as fallbacks)
+
+- **[Back4App Containers](https://www.back4app.com/pricing/container-as-a-service)** — same idea, no card required, deploys the same `Dockerfile`. Steps: **New App → Containers as a Service** → connect GitHub → select this repo/branch → set the same env vars (names must be uppercase, starting with a letter/underscore) → **Create App**. Hit a "unable to connect to your GitHub account" error during setup on one attempt — if you retry, try a desktop browser and check GitHub → Settings → Applications for a stuck Back4App authorization to revoke first.
+- **[Render](https://render.com)** — `render.yaml` (a Blueprint) and the `render-build`/`render-start` npm scripts are ready. Render's Blueprint flow prompted for a paid plan on this account; a plain free **Web Service** created manually (New → Web Service → this repo/branch → Build Command `npm run render-build` → Start Command `npm run render-start`, same env vars set by hand) may still work without a Blueprint.
 
 No manual deploy has been triggered as part of preparing these files — the steps above are yours to run whenever you're ready.
 
