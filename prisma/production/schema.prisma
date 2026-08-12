@@ -18,7 +18,12 @@
 // See README.md → "Deploying to Render (free tier) with Neon Postgres".
 
 generator client {
-  provider = "prisma-client-js"
+  provider      = "prisma-client-js"
+  // Explicit (not "native") because this schema's `prisma generate` may run
+  // on a build machine whose OS differs from Netlify's Lambda runtime
+  // (Amazon Linux). Pinning both OpenSSL ABIs covers Node 18 and Node 20+
+  // function runtimes regardless of where the client was generated.
+  binaryTargets = ["rhel-openssl-1.0.x", "rhel-openssl-3.0.x"]
 }
 
 datasource db {
