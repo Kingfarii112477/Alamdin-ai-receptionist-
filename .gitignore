@@ -9,3 +9,7 @@ prisma/*.db-journal
 npm-debug.log*
 .DS_Store
 coverage/
+
+# Local Netlify folder
+.netlify
+deno.lock

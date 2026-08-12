@@ -164,20 +164,30 @@ The `Dockerfile` builds against **PostgreSQL** (`prisma/production/migrations/`)
 
 Without Docker: `npm run build`, ship the `dist/`, `prisma/`, `web/`, and `node_modules/` (or `package.json` + `npm ci --omit=dev`) directories to any Node 18+ host, set env vars (with a Postgres `DATABASE_URL`), run `npm run prisma:deploy:prod && npm start`.
 
-## Deploying to Zeabur (free tier)
+## Deploying to Netlify (free tier, serverless — current recommendation)
 
-**Recommended free option.** [Zeabur](https://zeabur.com) builds and runs the `Dockerfile` above directly (no credit card required) and [Neon](https://neon.tech) provides the permanently-free PostgreSQL database. (Render and Back4App were tried first — see below — but hit a Blueprint paywall and a GitHub-connection error respectively; Zeabur is the current recommended path.)
+[Netlify](https://netlify.com)'s free tier is confirmed no-credit-card, and hosts this app as a serverless function (like Vercel below) rather than a persistent container. Static assets (chat UI, admin dashboard) are served directly by Netlify's CDN; `/health` and `/api/v1/*` are handled by a single Netlify Function wrapping the existing Express app — **`src/` is completely unchanged**. This repo already has everything needed:
+
+- `netlify/functions/api.ts` — wraps the same `createApp()` used everywhere else with `serverless-http`. No route logic duplicated or rewritten.
+- `netlify.toml` — `publish = "public"` (a copy of `web/public/`, same reasoning as Vercel below), a build command that generates the Postgres Prisma Client and runs `prisma migrate deploy` against `prisma/production/schema.prisma`, and redirects mapping `/health` and `/api/*` to the function while preserving the original path (`/api/v1/chat` reaches the function as `/api/v1/chat`, matching `app.use("/api/v1", ...)` unchanged).
+
+Verified locally with the actual Netlify CLI (`netlify dev`) emulating the redirects and function: both `/health` and `POST /api/v1/chat` were confirmed reaching the Express app and returning `200` correctly. (The local CLI itself has a known, reported worker-thread bug — [netlify/cli#2244](https://github.com/netlify/cli/issues/2244) and similar — that kills the dev process right after each successful response; this is a local-tooling issue, not an application bug, and doesn't reflect how the real deployed Netlify Function behaves.)
+
+Two real bugs were found and fixed while testing this path — both apply to **every** proxied/serverless deploy target, not just Netlify:
+- `app.set("trust proxy", 1)` added to `src/app.ts` — without it, `express-rate-limit` refuses to start behind any reverse proxy that sets `X-Forwarded-For` (which every host here does).
+- `src/middleware/rateLimiter.ts` now has a defensive `keyGenerator` that falls back to parsing `X-Forwarded-For` directly (and finally a shared bucket) instead of crashing when `req.ip` is undefined, which some serverless runtimes don't always populate.
 
 **Steps:**
 
-1. **Create the free database** at [neon.tech](https://neon.tech) if you haven't already — copy the `postgresql://...?sslmode=require` connection string.
-2. Push this repo to GitHub (already done for this project).
-3. **Zeabur dashboard → Create Project → Deploy New Service → GitHub**, authorize/install the Zeabur GitHub App (one-time), then select the `Kingfarii112477/Alamdin-ai-receptionist-` repo and the `claude/alamdin-ai-receptionist-2yshb7` branch. Zeabur detects the root `Dockerfile` automatically and builds from it.
-4. Open the new service → **Variables** tab and add: `DATABASE_URL` (the Neon string), `ADMIN_API_KEY` (a strong secret), `NODE_ENV=production`, and optionally `AI_API_KEY` if you want real-LLM FAQ answers instead of the offline template provider (leave blank otherwise).
-5. Zeabur builds and deploys automatically. It runs the container's `CMD`, which applies pending Postgres migrations (`prisma migrate deploy --schema=prisma/production/schema.prisma`) and then starts the server.
-6. Go to the service's **Domains** tab and click **Generate Domain** to get a free public `*.zeabur.app` HTTPS URL — chat UI at `/`, admin dashboard at `/admin.html`, API under `/api/v1/*`.
+1. Have your Neon `DATABASE_URL` ready.
+2. **[app.netlify.com](https://app.netlify.com) → Add new site → Import an existing project**, authorize GitHub, select `Kingfarii112477/Alamdin-ai-receptionist-`, branch `claude/alamdin-ai-receptionist-2yshb7`. Netlify reads `netlify.toml` automatically — no build settings to configure by hand.
+3. **Site configuration → Environment variables** → add `DATABASE_URL`, `ADMIN_API_KEY`, `NODE_ENV=production`, and optionally `AI_API_KEY` (leave blank for the offline template provider). Make sure they're available to the build (migrations run during the build step).
+4. Click **Deploy**.
+5. Your app is live at the `*.netlify.app` URL Netlify assigns — chat UI at `/`, admin dashboard at `/admin.html`, API under `/api/v1/*`.
 
-Note: Zeabur's free plan sleeps a service after a period of inactivity, waking on the next request with a few seconds of cold-start delay — the same tradeoff as Render's/Back4App's free tiers.
+## Deploying to Zeabur — no longer viable (kept for reference)
+
+Previously recommended, but Zeabur retired free deployment for new projects in April 2026 — new projects now require either purchasing a dedicated server through Zeabur or bringing your own already-paid server. Not usable as a free option anymore; `Dockerfile` and `prisma/production/` remain fully compatible with it if that ever changes, or if you have your own server to connect.
 
 ## Deploying to Vercel (free tier, serverless — structurally different option)
 
@@ -204,6 +214,7 @@ Unlike the options above, [Vercel](https://vercel.com)'s free **Hobby** plan run
 
 - **[Back4App Containers](https://www.back4app.com/pricing/container-as-a-service)** — same idea, no card required, deploys the same `Dockerfile`. Steps: **New App → Containers as a Service** → connect GitHub → select this repo/branch → set the same env vars (names must be uppercase, starting with a letter/underscore) → **Create App**. Hit a "unable to connect to your GitHub account" error during setup on one attempt — if you retry, try a desktop browser and check GitHub → Settings → Applications for a stuck Back4App authorization to revoke first.
 - **[Render](https://render.com)** — `render.yaml` (a Blueprint) and the `render-build`/`render-start` npm scripts are ready, but both Render's Blueprint flow *and* its manually-created Web Service flow prompted for a credit card/paid plan on this account — Render is not currently usable free for this account.
+- **[Railway](https://railway.com)** — no card required to start, but it's a one-time $5 trial credit (roughly 9 days for a small app like this), not an ongoing free tier — after that it requires a card. Not used for that reason.
 
 No manual deploy has been triggered as part of preparing these files — the steps above are yours to run whenever you're ready.
 

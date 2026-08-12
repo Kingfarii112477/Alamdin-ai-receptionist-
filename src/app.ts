@@ -12,6 +12,15 @@ import { logger } from "./utils/logger";
 export function createApp() {
   const app = express();
 
+  // Every real hosting target for this app (Netlify, Vercel, Render, Zeabur,
+  // Docker behind any load balancer) terminates TLS and proxies requests,
+  // adding an X-Forwarded-For header. Without trust proxy enabled here,
+  // express-rate-limit refuses to start (ERR_ERL_UNEXPECTED_X_FORWARDED_FOR)
+  // rather than risk trusting a spoofable header. Trusting exactly one hop
+  // is the standard, safe setting for a single reverse proxy in front of
+  // the app — see https://expressjs.com/en/guide/behind-proxies.html.
+  app.set("trust proxy", 1);
+
   app.disable("x-powered-by");
   app.use(
     helmet({
