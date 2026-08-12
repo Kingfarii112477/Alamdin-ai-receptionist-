@@ -14,6 +14,13 @@ const envSchema = z.object({
   AI_API_KEY: z.string().optional(),
   AI_BASE_URL: z.string().url().default("https://api.openai.com/v1"),
   AI_MODEL: z.string().default("gpt-4o-mini"),
+  // Optional, provider-agnostic pass-through. Some OpenAI-compatible
+  // providers (e.g. Gemini's reasoning models) spend part of max_tokens on
+  // hidden "thinking" tokens before the visible reply, which can truncate
+  // short receptionist responses. Set to "none"/"low" for such providers;
+  // leave unset for providers that don't support/need it (e.g. plain
+  // OpenAI gpt-4o-mini).
+  AI_REASONING_EFFORT: z.string().optional(),
 
   CORS_ORIGIN: z.string().default("*"),
 

@@ -33,7 +33,8 @@ export class OpenAICompatibleProvider implements AIProvider {
           model: env.AI_MODEL,
           messages,
           temperature: 0.4,
-          max_tokens: 300
+          max_tokens: 500,
+          ...(env.AI_REASONING_EFFORT ? { reasoning_effort: env.AI_REASONING_EFFORT } : {})
         }),
         signal: controller.signal
       });

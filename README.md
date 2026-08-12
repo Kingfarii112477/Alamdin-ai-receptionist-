@@ -100,12 +100,15 @@ npm run prisma:studio  # browse the database visually
 | `AI_API_KEY` | *(empty)* | Leave empty to run fully offline with the built-in template provider |
 | `AI_BASE_URL` | `https://api.openai.com/v1` | Any OpenAI-compatible `/chat/completions` endpoint (OpenAI, OpenRouter, a Gemini-compatible proxy, etc.) |
 | `AI_MODEL` | `gpt-4o-mini` | Model name for the configured provider |
+| `AI_REASONING_EFFORT` | *(unset)* | Optional pass-through. Reasoning/"thinking" models (e.g. Gemini) can silently truncate short replies by spending the token budget on hidden reasoning first — set this to bound/disable it. Leave unset for plain OpenAI. |
 | `CORS_ORIGIN` | `*` | Comma-separated allow-list, or `*` |
 | `RATE_LIMIT_WINDOW_MS` / `RATE_LIMIT_MAX` | `60000` / `60` | Requests per window per IP on `/api/v1/*` |
 | `ADMIN_API_KEY` | `change-me-admin-key` | Required in `X-Admin-Key` header for appointment listing/status endpoints and the admin UI. **Change this in production.** |
 | `LOG_LEVEL` | `info` | pino log level |
 
 No AI API key is required to run the full system end-to-end — the offline `TemplateProvider` handles anything the deterministic intent matcher can't, with an honest "please call us" fallback. Add `AI_API_KEY` any time to upgrade small-talk/FAQ replies to a real LLM without changing any other code.
+
+**Using Google Gemini:** set `AI_API_KEY` to a Gemini API key, `AI_BASE_URL=https://generativelanguage.googleapis.com/v1beta/openai`, `AI_MODEL=gemini-3.6-flash` (or your preferred Gemini model), and `AI_REASONING_EFFORT=minimal` — without the last one, Gemini's reasoning models spend most/all of `max_tokens` on hidden "thinking" and return truncated replies (confirmed live: `total_tokens` dropped from 382 to 17 for the same trivial prompt once `reasoning_effort` was set to `minimal`; the value `"none"` is rejected by Gemini's API as invalid, unlike some other reasoning-model providers).
 
 ## API
 
