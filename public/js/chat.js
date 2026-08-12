@@ -1,5 +1,6 @@
 (() => {
   const STORAGE_KEY = "alamdin_conversation_id";
+  const SOUND_KEY = "alamdin_sound_enabled";
 
   const chatScroll = document.getElementById("chatScroll");
   const emptyState = document.getElementById("emptyState");
@@ -7,9 +8,13 @@
   const input = document.getElementById("messageInput");
   const sendBtn = document.getElementById("sendBtn");
   const resetBtn = document.getElementById("resetBtn");
+  const soundBtn = document.getElementById("soundBtn");
+  const soundOnIcon = document.getElementById("soundOnIcon");
+  const soundOffIcon = document.getElementById("soundOffIcon");
 
   let conversationId = localStorage.getItem(STORAGE_KEY) || null;
   let busy = false;
+  let soundEnabled = localStorage.getItem(SOUND_KEY) !== "off";
 
   const SUMMARY_MARKERS = ["Appointment Request", "اپائنٹمنٹ کی درخواست"];
   const RECEIVED_MARKERS = ["request has been received", "درخواست موصول ہو گئی ہے", "request receive ho gayi"];
@@ -21,6 +26,65 @@
     return RECEIVED_MARKERS.some((m) => text.includes(m));
   }
 
+  // ---------- Playful synthesized sound effects (no audio files needed) ----------
+
+  let audioCtx = null;
+
+  function getAudioCtx() {
+    const Ctx = window.AudioContext || window.webkitAudioContext;
+    if (!Ctx) return null;
+    if (!audioCtx) audioCtx = new Ctx();
+    if (audioCtx.state === "suspended") audioCtx.resume();
+    return audioCtx;
+  }
+
+  function beep({ freqStart, freqEnd, duration, type = "sine", gain = 0.05 }) {
+    if (!soundEnabled) return;
+    const ctx = getAudioCtx();
+    if (!ctx) return;
+    try {
+      const osc = ctx.createOscillator();
+      const gainNode = ctx.createGain();
+      osc.type = type;
+      osc.frequency.setValueAtTime(freqStart, ctx.currentTime);
+      osc.frequency.exponentialRampToValueAtTime(Math.max(freqEnd, 1), ctx.currentTime + duration);
+      gainNode.gain.setValueAtTime(gain, ctx.currentTime);
+      gainNode.gain.exponentialRampToValueAtTime(0.0001, ctx.currentTime + duration);
+      osc.connect(gainNode).connect(ctx.destination);
+      osc.start();
+      osc.stop(ctx.currentTime + duration);
+    } catch {
+      // audio unsupported/blocked — fail silently, sound is a nice-to-have
+    }
+  }
+
+  function playSend() {
+    beep({ freqStart: 480, freqEnd: 780, duration: 0.11, type: "sine", gain: 0.045 });
+  }
+  function playReceive() {
+    beep({ freqStart: 640, freqEnd: 400, duration: 0.16, type: "sine", gain: 0.045 });
+  }
+  function playCelebrate() {
+    beep({ freqStart: 520, freqEnd: 1040, duration: 0.22, type: "triangle", gain: 0.05 });
+  }
+
+  function updateSoundIcon() {
+    soundOnIcon.style.display = soundEnabled ? "block" : "none";
+    soundOffIcon.style.display = soundEnabled ? "none" : "block";
+    soundBtn.classList.toggle("muted", !soundEnabled);
+  }
+
+  soundBtn.addEventListener("click", () => {
+    soundEnabled = !soundEnabled;
+    localStorage.setItem(SOUND_KEY, soundEnabled ? "on" : "off");
+    updateSoundIcon();
+    if (soundEnabled) playSend();
+  });
+
+  updateSoundIcon();
+
+  // ---------- Chat rendering ----------
+
   function hideEmptyState() {
     if (emptyState) emptyState.style.display = "none";
   }
@@ -29,7 +93,7 @@
     chatScroll.scrollTop = chatScroll.scrollHeight;
   }
 
-  function appendMessage(role, content) {
+  function appendMessage(role, content, { silent = false } = {}) {
     hideEmptyState();
 
     const row = document.createElement("div");
@@ -44,7 +108,9 @@
     bubble.setAttribute("dir", "auto");
     bubble.textContent = content;
 
-    if (role === "assistant" && isReceived(content)) {
+    const received = role === "assistant" && isReceived(content);
+
+    if (received) {
       bubble.classList.add("request-received");
     } else if (role === "assistant" && isSummary(content)) {
       bubble.classList.add("summary-card");
@@ -54,11 +120,17 @@
     row.appendChild(bubble);
     chatScroll.appendChild(row);
 
-    if (role === "assistant" && isReceived(content)) {
+    if (received) {
       const banner = document.createElement("div");
       banner.className = "status-banner";
       banner.textContent = "✓ Request received — not yet confirmed";
       chatScroll.appendChild(banner);
+    }
+
+    if (!silent) {
+      if (role === "user") playSend();
+      else if (received) playCelebrate();
+      else playReceive();
     }
 
     scrollToBottom();
@@ -97,7 +169,7 @@
       if (data.messages && data.messages.length) {
         for (const m of data.messages) {
           if (m.role === "user" || m.role === "assistant") {
-            appendMessage(m.role, m.content);
+            appendMessage(m.role, m.content, { silent: true });
           }
         }
       }
