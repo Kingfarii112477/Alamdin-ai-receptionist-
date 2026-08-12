@@ -179,10 +179,31 @@ Without Docker: `npm run build`, ship the `dist/`, `prisma/`, `web/`, and `node_
 
 Note: Zeabur's free plan sleeps a service after a period of inactivity, waking on the next request with a few seconds of cold-start delay — the same tradeoff as Render's/Back4App's free tiers.
 
+## Deploying to Vercel (free tier, serverless — structurally different option)
+
+Unlike the options above, [Vercel](https://vercel.com)'s free **Hobby** plan runs the app as a serverless function rather than a persistent container — genuinely no credit card required per Vercel's own docs, and they now support deploying an existing Express app with (their words) "zero configuration." This repo is already set up for it:
+
+- `index.ts` (repo root) — re-exports the same `createApp()` used everywhere else, at one of Vercel's conventional entry-point paths. Nothing about `src/` changed.
+- `public/` (repo root) — a copy of `web/public/`, because Vercel's Express integration serves static assets only from a root `public/**` directory and ignores `express.static()` (the original `web/public/` stays as-is for every other deploy target).
+- `vercel.json` — pins the build command explicitly: generates the Postgres Prisma Client and runs `prisma migrate deploy` against `prisma/production/schema.prisma` during the build step.
+
+**Steps:**
+
+1. Have your Neon `DATABASE_URL` ready (same one used above).
+2. **[vercel.com](https://vercel.com) → Add New → Project**, connect/authorize GitHub, select `Kingfarii112477/Alamdin-ai-receptionist-`, branch `claude/alamdin-ai-receptionist-2yshb7`. Framework Preset can stay "Other" — `vercel.json` already sets the build command.
+3. In **Environment Variables**, add `DATABASE_URL`, `ADMIN_API_KEY`, `NODE_ENV=production`, and optionally `AI_API_KEY` — make sure they're enabled for the **Production** environment (so they're available at build time too, since migrations run during the build step here).
+4. Click **Deploy**.
+5. Your app is live at the `*.vercel.app` URL Vercel assigns.
+
+**Tradeoffs worth knowing before choosing this one:**
+- Vercel's Hobby plan is licensed for personal/non-commercial use per their Terms of Service — this app is for a real clinic, so if you outgrow Hobby or want to stay fully within their ToS for a live business tool, Vercel Pro (paid) would be the compliant tier. Fine for testing/demo purposes on Hobby in the meantime.
+- The in-memory rate limiter (`express-rate-limit`) resets per serverless instance rather than staying consistent across all traffic the way it does on a persistent server (Zeabur/Docker) — a cosmetic security-hardening difference, not a functional break.
+- Cold starts happen more granularly (per idle gap) than the "sleep after 15 min" model of the container platforms above.
+
 ## Other free options tried (kept as fallbacks)
 
 - **[Back4App Containers](https://www.back4app.com/pricing/container-as-a-service)** — same idea, no card required, deploys the same `Dockerfile`. Steps: **New App → Containers as a Service** → connect GitHub → select this repo/branch → set the same env vars (names must be uppercase, starting with a letter/underscore) → **Create App**. Hit a "unable to connect to your GitHub account" error during setup on one attempt — if you retry, try a desktop browser and check GitHub → Settings → Applications for a stuck Back4App authorization to revoke first.
-- **[Render](https://render.com)** — `render.yaml` (a Blueprint) and the `render-build`/`render-start` npm scripts are ready. Render's Blueprint flow prompted for a paid plan on this account; a plain free **Web Service** created manually (New → Web Service → this repo/branch → Build Command `npm run render-build` → Start Command `npm run render-start`, same env vars set by hand) may still work without a Blueprint.
+- **[Render](https://render.com)** — `render.yaml` (a Blueprint) and the `render-build`/`render-start` npm scripts are ready, but both Render's Blueprint flow *and* its manually-created Web Service flow prompted for a credit card/paid plan on this account — Render is not currently usable free for this account.
 
 No manual deploy has been triggered as part of preparing these files — the steps above are yours to run whenever you're ready.
 

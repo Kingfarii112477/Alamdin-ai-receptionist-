@@ -1,0 +1,56 @@
+<!doctype html>
+<html lang="en">
+  <head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1" />
+    <title>Alamdin AI Receptionist — Admin</title>
+    <link rel="stylesheet" href="/css/styles.css" />
+  </head>
+  <body>
+    <div id="gateScreen" class="gate-screen">
+      <div class="brand-mark" style="margin: 0 auto 18px">A</div>
+      <h1>Admin Dashboard</h1>
+      <p>Enter the admin key to view conversations and appointment requests.</p>
+      <form id="gateForm">
+        <input type="password" id="adminKeyInput" placeholder="Admin API key" autocomplete="off" />
+        <button type="submit" class="btn">Unlock dashboard</button>
+      </form>
+      <p class="hint">The admin key is set via the ADMIN_API_KEY environment variable.</p>
+    </div>
+
+    <div id="dashboard" class="admin-shell" style="display: none">
+      <div class="admin-topbar">
+        <div class="brand-copy">
+          <h1 style="font-size: 18px; margin: 0">Alamdin AI Receptionist — Admin</h1>
+          <p style="margin: 4px 0 0">Appointment requests &amp; status</p>
+        </div>
+        <div style="display: flex; gap: 8px">
+          <button class="btn secondary" id="refreshBtn">Refresh</button>
+          <button class="btn secondary" id="logoutBtn">Log out</button>
+        </div>
+      </div>
+
+      <div class="stat-grid" id="statGrid"></div>
+
+      <div class="table-wrap">
+        <table>
+          <thead>
+            <tr>
+              <th>Patient</th>
+              <th>Phone</th>
+              <th>Reason</th>
+              <th>Requested date</th>
+              <th>Requested time</th>
+              <th>Status</th>
+              <th>Created</th>
+            </tr>
+          </thead>
+          <tbody id="tableBody"></tbody>
+        </table>
+        <div class="empty-table" id="emptyTable" style="display: none">No appointment requests yet.</div>
+      </div>
+    </div>
+
+    <script src="/js/admin.js"></script>
+  </body>
+</html>
