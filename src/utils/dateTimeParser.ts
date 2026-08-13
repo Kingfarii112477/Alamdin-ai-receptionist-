@@ -234,11 +234,16 @@ export function parseDateExpression(raw: string, now = nowInKarachi()): DatePars
     }
   }
 
-  // 5) Weekday name ("Friday", "juma") -> next occurrence (today counts as day 0)
+  // 5) Weekday name ("Friday", "juma") -> next occurrence (today counts as day 0).
+  // "next Friday"/"agli Friday" when today already IS that weekday means the
+  // following week's occurrence, not today — "aglay hafte" (next week) alone,
+  // with no specific day, stays genuinely ambiguous rather than guessing.
+  const hasNextMarker = /\bnext\b|\bagl[ei]\b|\baglay\b/.test(text);
   for (const [word, dow] of Object.entries(WEEKDAY_WORDS)) {
     if (new RegExp(`\\b${word}\\b`).test(text)) {
       const todayDow = weekdayOf(now.year, now.month, now.day);
       let diff = (dow - todayDow + 7) % 7;
+      if (diff === 0 && hasNextMarker) diff = 7;
       const { year: y2, month: m2, day: d2 } = fromEpochDay(todayEpoch + diff);
       return { iso: toISO(y2, m2, d2), label: formatLabel(y2, m2, d2), ambiguous: false };
     }
@@ -274,7 +279,20 @@ export function parseTimeExpression(raw: string): TimeParseResult {
 
   let hour = Number(match[1]);
   const minute = match[2] ? Number(match[2]) : 0;
-  if (hour < 1 || hour > 12 || minute > 59) {
+  if (minute > 59) {
+    return { label: null, hhmm: null, ambiguous: true };
+  }
+
+  // Explicit 24-hour format ("20:00", "raat 21:30") is unambiguous by
+  // construction — no AM/PM guessing needed.
+  if (hour >= 13 && hour <= 23) {
+    const hour12 = hour - 12;
+    const label = `${hour12}:${minute.toString().padStart(2, "0")} PM`;
+    const hhmm = `${hour.toString().padStart(2, "0")}:${minute.toString().padStart(2, "0")}`;
+    return { label, hhmm, ambiguous: false };
+  }
+
+  if (hour < 1 || hour > 12) {
     return { label: null, hhmm: null, ambiguous: true };
   }
 

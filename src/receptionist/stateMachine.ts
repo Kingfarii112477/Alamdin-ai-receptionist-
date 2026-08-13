@@ -22,9 +22,12 @@ const PHONE_DIGITS = /\d/g;
 export function parsePhone(raw: string): { ok: true; value: string } | { ok: false } {
   const digits = (raw.match(PHONE_DIGITS) ?? []).join("");
   // Accepts Pakistani mobile numbers (03XXXXXXXXX, +923XXXXXXXXX) and is
-  // lenient enough for other reasonable-length numbers.
+  // lenient enough for other reasonable-length numbers. Storing the cleaned
+  // digits (not the raw sentence) matters once phone numbers can arrive
+  // embedded in a longer message, e.g. "number ye hai 0330 123 4567".
   if (digits.length < 10 || digits.length > 13) return { ok: false };
-  return { ok: true, value: raw.trim() };
+  const value = /^\s*\+/.test(raw) ? `+${digits}` : digits;
+  return { ok: true, value };
 }
 
 export function parseReason(raw: string): { ok: true; value: string } | { ok: false } {

@@ -13,8 +13,10 @@ import { isoToLabel } from "../utils/dateTimeParser";
 import { detectLanguage } from "../utils/language";
 import { sanitizeText } from "../utils/sanitize";
 import { logger } from "../utils/logger";
-import { classifyIntent, isAffirmative, isEmergency } from "./intents";
+import { classifyIntent, detectSecondaryFactIntent, isAffirmative, isEmergency, type FactIntent } from "./intents";
 import { R, SUMMARY_LABELS, t } from "./responses";
+import { detectCorrection, detectImplicitValueChange } from "./correction";
+import { extractEmbeddedFields } from "./slotExtractor";
 import {
   applyFieldAnswer,
   detectFieldFromText,
@@ -82,15 +84,70 @@ function buildSummaryMessage(fields: AppointmentFields, language: Language): str
   const lines = [
     t(R.summaryHeader, language),
     "",
-    `${labels.name}: ${fields.patientName ?? ""}`,
-    `${labels.phone}: ${fields.phone ?? ""}`,
-    `${labels.reason}: ${fields.reason ?? ""}`,
-    `${labels.date}: ${dateLabel}`,
-    `${labels.time}: ${fields.preferredTimeNormalized ?? ""}`,
+    `👤 ${labels.name}: ${fields.patientName ?? ""}`,
+    `📱 ${labels.phone}: ${fields.phone ?? ""}`,
+    `🦷 ${labels.reason}: ${fields.reason ?? ""}`,
+    `📅 ${labels.date}: ${dateLabel}`,
+    `🕐 ${labels.time}: ${fields.preferredTimeNormalized ?? ""}`,
     "",
     t(R.summaryConfirmQuestion, language)
   ];
   return lines.join("\n");
+}
+
+function fieldLabelFor(stage: Stage, language: Language): string {
+  const labels = SUMMARY_LABELS[language];
+  switch (stage) {
+    case "COLLECTING_NAME":
+      return labels.name;
+    case "COLLECTING_PHONE":
+      return labels.phone;
+    case "COLLECTING_REASON":
+      return labels.reason;
+    case "COLLECTING_DATE":
+      return labels.date;
+    case "COLLECTING_TIME":
+      return labels.time;
+    default:
+      return "";
+  }
+}
+
+/** Answers a clinic-fact question layered onto another message — see detectSecondaryFactIntent. */
+function factReply(intent: FactIntent, language: Language): string {
+  switch (intent) {
+    case "FEE":
+      return t(R.feeInfo, language);
+    case "HOURS_CLINIC":
+      return t(R.hoursInfo, language, "clinic");
+    case "HOURS_HOSPITAL":
+      return t(R.hoursInfo, language, "hospital");
+    case "HOURS_GENERAL":
+      return t(R.hoursInfo, language, "both");
+    case "LOCATION":
+      return t(R.locationInfo, language);
+    case "DOCTOR":
+      return t(R.doctorInfo, language);
+    case "SERVICES":
+      return t(R.servicesInfo, language);
+    case "CONTACT":
+      return t(R.contactInfo, language);
+    case "RATINGS":
+      return t(R.ratingsInfo, language);
+    case "SOCIAL":
+      return t(R.socialInfo, language);
+  }
+}
+
+/** Fills in only the fields that are still unset — never overwrites a field the patient already gave a different value for. */
+function fillMissingFields(base: AppointmentFields, extra: Partial<AppointmentFields>): AppointmentFields {
+  const merged: AppointmentFields = { ...base };
+  (Object.keys(extra) as (keyof AppointmentFields)[]).forEach((key) => {
+    if (merged[key] == null && extra[key] != null) {
+      (merged[key] as string | null) = extra[key] as string;
+    }
+  });
+  return merged;
 }
 
 function toStateDTO(stage: Stage, fields: AppointmentFields): ConversationStateDTO {
@@ -151,13 +208,16 @@ export async function processMessage(conversationId: string | undefined, rawMess
   let reply: string;
 
   const isCollecting = stage.startsWith("COLLECTING_");
+  const primaryIntent = classifyIntent(message);
 
-  if (!isCollecting && classifyIntent(message) === "SAFETY_CONCERN") {
+  if (!isCollecting && primaryIntent === "SAFETY_CONCERN") {
     reply = t(R.safetyDecline, language);
   } else if (!isCollecting && isEmergency(message)) {
     reply = t(R.emergencyGuidance, language);
+  } else if (!isCollecting && primaryIntent === "HUMAN_HANDOFF") {
+    reply = t(R.humanHandoff, language);
   } else if (isCollecting) {
-    if (classifyIntent(message) === "CANCEL") {
+    if (primaryIntent === "CANCEL") {
       fields = {
         patientName: null,
         phone: null,
@@ -171,26 +231,68 @@ export async function processMessage(conversationId: string | undefined, rawMess
       confirmationStatus = "NOT_APPLICABLE";
       reply = t(R.cancelled, language);
     } else {
-      const result = applyFieldAnswer(stage, message);
-      if (!result.ok) {
-        if (result.reason === "ambiguous") {
-          reply = stage === "COLLECTING_DATE" ? t(R.dateAmbiguous, language) : t(R.timeAmbiguous, language);
-        } else if (stage === "COLLECTING_PHONE") {
-          reply = t(R.invalidPhone, language);
-        } else {
-          reply = promptForStage(stage, language, fields);
-        }
-      } else {
-        fields = { ...fields, ...result.fields };
+      // A message can (a) directly answer the field currently being asked —
+      // possibly with an inline self-correction like "8 nahi 9 baje" — or
+      // (b) correct a DIFFERENT, already-provided field while the current
+      // question is still unanswered, e.g. "actually mera naam Bilal hai"
+      // while COLLECTING_PHONE. detectCorrection tells these apart; a
+      // message that isn't a recognizable correction at all (the ordinary
+      // case — a plain "Ahmed", "03301234567", "Kal") returns null and
+      // falls straight through to the unchanged original per-field parsing.
+      const correction = detectCorrection(message);
+
+      if (correction && correction.stage === stage) {
+        fields = { ...fields, ...correction.fields };
         const next = nextCollectingStage(fields);
         stage = next;
-        reply = next === "CONFIRMING_SUMMARY" ? buildSummaryMessage(fields, language) : promptForStage(next, language, fields);
+        const secondaryFact = detectSecondaryFactIntent(message);
+        const factAnswer = secondaryFact ? `${factReply(secondaryFact, language)}\n\n` : "";
+        reply = factAnswer + (next === "CONFIRMING_SUMMARY" ? buildSummaryMessage(fields, language) : promptForStage(next, language, fields));
         if (next === "CONFIRMING_SUMMARY") confirmationStatus = "PENDING";
+      } else {
+        let ackPrefix = "";
+        if (correction && correction.stage !== stage) {
+          fields = { ...fields, ...correction.fields };
+          ackPrefix = `${t(R.correctionAck, language, fieldLabelFor(correction.stage, language), correction.displayValue)}\n\n`;
+        }
+
+        const result = applyFieldAnswer(stage, message);
+        if (!result.ok) {
+          if (correction) {
+            // A different field was just corrected; the current question is
+            // still unanswered — re-ask it with the correction acknowledged.
+            reply = ackPrefix + promptForStage(stage, language, fields);
+          } else if (result.reason === "ambiguous") {
+            reply = stage === "COLLECTING_DATE" ? t(R.dateAmbiguous, language) : t(R.timeAmbiguous, language);
+          } else if (stage === "COLLECTING_PHONE") {
+            reply = t(R.invalidPhone, language);
+          } else {
+            reply = promptForStage(stage, language, fields);
+          }
+        } else {
+          fields = { ...fields, ...result.fields };
+          const next = nextCollectingStage(fields);
+          stage = next;
+          const secondaryFact = detectSecondaryFactIntent(message);
+          const factAnswer = secondaryFact ? `${factReply(secondaryFact, language)}\n\n` : "";
+          reply = ackPrefix + factAnswer + (next === "CONFIRMING_SUMMARY" ? buildSummaryMessage(fields, language) : promptForStage(next, language, fields));
+          if (next === "CONFIRMING_SUMMARY") confirmationStatus = "PENDING";
+        }
       }
     }
   } else if (stage === "CONFIRMING_SUMMARY") {
-    const intent = classifyIntent(message);
-    if (intent === "AFFIRM" || (isAffirmative(message) && intent !== "DENY")) {
+    // An explicit correction takes priority over confirming/denying: a
+    // message that both confirms AND corrects in the same turn (e.g. "haan
+    // par kal nahi parson") applies the correction and shows the updated
+    // summary for a fresh explicit confirmation, rather than guessing that
+    // both were meant to happen at once — consistent with never treating an
+    // appointment as settled without an unambiguous yes on the final details.
+    const correction = detectCorrection(message) ?? detectImplicitValueChange(message, fields);
+    if (correction) {
+      fields = { ...fields, ...correction.fields };
+      const ack = t(R.correctionAck, language, fieldLabelFor(correction.stage, language), correction.displayValue);
+      reply = `${ack}\n\n${buildSummaryMessage(fields, language)}`;
+    } else if (primaryIntent === "AFFIRM" || (isAffirmative(message) && primaryIntent !== "DENY")) {
       await createAppointmentRequest({
         conversationId: conv.id,
         patientName: fields.patientName!,
@@ -204,7 +306,7 @@ export async function processMessage(conversationId: string | undefined, rawMess
       stage = "REQUEST_SUBMITTED";
       confirmationStatus = "REQUESTED";
       reply = t(R.requestReceived, language);
-    } else if (intent === "DENY" || intent === "EDIT_REQUEST") {
+    } else if (primaryIntent === "DENY" || primaryIntent === "EDIT_REQUEST") {
       stage = "AWAITING_EDIT_FIELD";
       reply = t(R.editWhichField, language);
     } else {
@@ -233,19 +335,31 @@ export async function processMessage(conversationId: string | undefined, rawMess
     }
   } else {
     // IDLE or REQUEST_SUBMITTED
-    const intent = classifyIntent(message);
-    switch (intent) {
+    switch (primaryIntent) {
       case "APPOINTMENT_TRIGGER": {
+        // A trigger message can volunteer several fields at once, e.g.
+        // "Mera naam Ahmed hai aur mujhe kal 8 baje toothache ke liye
+        // appointment chahiye" — extract whatever's confidently there so
+        // nextCollectingStage only asks for what's genuinely still missing.
+        fields = fillMissingFields(fields, extractEmbeddedFields(message));
         const next = nextCollectingStage(fields);
         stage = next;
+        const secondaryFact = detectSecondaryFactIntent(message);
+        const factAnswer = secondaryFact ? `${factReply(secondaryFact, language)}\n\n` : "";
         if (next === "CONFIRMING_SUMMARY") {
           confirmationStatus = "PENDING";
-          reply = buildSummaryMessage(fields, language);
+          reply = factAnswer + buildSummaryMessage(fields, language);
         } else {
-          reply = promptForStage(next, language, fields);
+          reply = factAnswer + promptForStage(next, language, fields);
         }
         break;
       }
+      case "HUMAN_HANDOFF":
+        reply = t(R.humanHandoff, language);
+        break;
+      case "SERVICES":
+        reply = t(R.servicesInfo, language);
+        break;
       case "FEE":
         reply = t(R.feeInfo, language);
         break;
@@ -278,6 +392,13 @@ export async function processMessage(conversationId: string | undefined, rawMess
         break;
       case "CANCEL":
         reply = t(R.cancelled, language);
+        break;
+      case "EDIT_REQUEST":
+        // No active summary to edit here (that's handled inside
+        // CONFIRMING_SUMMARY/AWAITING_EDIT_FIELD) — this is a patient asking
+        // to change an already-submitted request, which the chat flow can't
+        // do on its own; point them to staff.
+        reply = t(R.rescheduleInfo, language);
         break;
       default:
         reply = await generateOpenEndedReply(conv.id, language, message);

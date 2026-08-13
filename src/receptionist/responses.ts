@@ -181,7 +181,37 @@ export const R = {
     english: "Would you like to submit a new appointment request?",
     urdu: "کیا آپ نئی اپائنٹمنٹ کی درخواست دینا چاہیں گے؟",
     "roman-urdu": "Kya aap nayi appointment request dena chahenge?"
-  })
+  }),
+
+  /** Acknowledges a mid-conversation correction to an already-provided field, e.g. "Bilkul, Naam: Muhammad Farooq. Update kar diya hai. ✅" */
+  correctionAck: (fieldLabel: string, value: string): Templated => ({
+    english: `Got it — ${fieldLabel}: ${value}. Updated.`,
+    urdu: `ٹھیک ہے — ${fieldLabel}: ${value}۔ اپڈیٹ ہو گیا۔`,
+    "roman-urdu": `Bilkul, ${fieldLabel}: ${value}. Update kar diya hai. ✅`
+  }),
+
+  humanHandoff: (): Templated => ({
+    english: `I'll have our team reach out to you. You can also call us directly at ${CLINIC.phone}.`,
+    urdu: `ہماری ٹیم آپ سے رابطہ کرے گی۔ آپ براہ راست ${CLINIC.phone} پر بھی کال کر سکتے ہیں۔`,
+    "roman-urdu": `Hamari team aapse rabta karegi. Aap seedha ${CLINIC.phone} par bhi call kar sakte hain.`
+  }),
+
+  /** To reschedule an already-SUBMITTED request — the chat flow has no way to edit a persisted AppointmentRequest, so this points to staff by phone rather than pretending to handle it. */
+  rescheduleInfo: (): Templated => ({
+    english: `To reschedule an already-submitted request, please call us at ${CLINIC.phone} and our team will help.`,
+    urdu: `پہلے سے جمع شدہ درخواست کو دوبارہ شیڈول کرنے کے لیے ${CLINIC.phone} پر کال کریں، ہماری ٹیم مدد کرے گی۔`,
+    "roman-urdu": `Pehle se submit ki gayi request reschedule karne ke liye ${CLINIC.phone} par call karein, hamari team madad karegi.`
+  }),
+
+  /** Sourced only from CLINIC.doctor.qualifications — never an invented services catalog. */
+  servicesInfo: (): Templated => {
+    const quals = CLINIC.doctor.qualifications.join(", ");
+    return {
+      english: `Dr. Alamdin is certified in implants, veneers, root canal (endodontics), and crowns & bridges (${quals}). For anything not listed here, please call ${CLINIC.phone} to confirm.`,
+      urdu: `ڈاکٹر علمدین امپلانٹس، وینیئرز، روٹ کینال (اینڈوڈونٹکس)، اور کراؤن اینڈ برج میں سرٹیفائیڈ ہیں (${quals})۔ کسی اور سروس کی تصدیق کے لیے ${CLINIC.phone} پر کال کریں۔`,
+      "roman-urdu": `Dr. Alamdin implants, veneers, root canal (endodontics), aur crowns & bridges mein certified hain (${quals}). Kisi aur service ke baare mein ${CLINIC.phone} par call kar ke confirm kar lein.`
+    };
+  }
 };
 
 export function t<T extends unknown[]>(fn: TemplatedFn<T>, lang: Language, ...args: T): string {
@@ -189,8 +219,8 @@ export function t<T extends unknown[]>(fn: TemplatedFn<T>, lang: Language, ...ar
 }
 
 export const SUMMARY_LABELS: Record<Language, { name: string; phone: string; reason: string; date: string; time: string }> = {
-  english: { name: "Name", phone: "Phone", reason: "Reason", date: "Preferred date", time: "Preferred time" },
-  urdu: { name: "نام", phone: "فون", reason: "وجہ", date: "مطلوبہ تاریخ", time: "مطلوبہ وقت" },
-  "roman-urdu": { name: "Naam", phone: "Phone", reason: "Reason", date: "Preferred date", time: "Preferred time" }
+  english: { name: "Name", phone: "Phone", reason: "Reason", date: "Date", time: "Time" },
+  urdu: { name: "نام", phone: "فون", reason: "وجہ", date: "تاریخ", time: "وقت" },
+  "roman-urdu": { name: "Naam", phone: "Phone", reason: "Reason", date: "Date", time: "Time" }
 };
 
