@@ -89,15 +89,19 @@ export function extractEmbeddedFields(text: string): Partial<AppointmentFields> 
   const reason = extractReasonFromText(text);
   if (reason) fields.reason = reason;
 
+  // Store the parsed label, not the whole surrounding sentence, as the "raw"
+  // value — this is shown to staff as-is in the admin dashboard, and a
+  // multi-field trigger message like "Mera naam Ahmed hai aur mujhe kal 8
+  // baje..." would otherwise dump its entire text into that column.
   const date = parseDateExpression(text);
   if (!date.ambiguous && date.iso) {
-    fields.preferredDateRaw = text.trim();
+    fields.preferredDateRaw = date.label ?? text.trim();
     fields.preferredDateISO = date.iso;
   }
 
   const time = parseTimeExpression(text);
   if (!time.ambiguous && time.hhmm) {
-    fields.preferredTimeRaw = text.trim();
+    fields.preferredTimeRaw = time.label ?? text.trim();
     fields.preferredTimeNormalized = time.label;
   }
 
