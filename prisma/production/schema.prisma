@@ -108,6 +108,34 @@ model AppointmentRequest {
   @@index([createdAt])
 }
 
+/// WhatsApp adapter bookkeeping only (src/channels/whatsapp/) — NOT read or
+/// written by the receptionist engine. Maps a WhatsApp phone number to the
+/// existing Conversation it should continue, so a returning patient's
+/// message reuses their conversation instead of starting a new one. Kept as
+/// a plain (non-relational) foreign key on purpose, so the core Conversation
+/// model above never has to change to support a new channel.
+model WhatsAppContact {
+  id             String   @id @default(cuid())
+  phoneNumber    String   @unique
+  conversationId String   @unique
+
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+}
+
+/// Idempotency guard for the WhatsApp webhook: Meta can and does redeliver
+/// the same event. Recording each processed WhatsApp message id here lets
+/// the webhook handler recognize a duplicate delivery and skip reprocessing
+/// it instead of replying twice or double-booking an appointment.
+model WhatsAppProcessedMessage {
+  id                String   @id @default(cuid())
+  whatsappMessageId String   @unique
+
+  createdAt DateTime @default(now())
+
+  @@index([createdAt])
+}
+
 // ---------------------------------------------------------------------------
 // Future extension points (deliberately NOT modeled yet, per project scope):
 //

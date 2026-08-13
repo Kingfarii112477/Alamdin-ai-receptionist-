@@ -29,7 +29,17 @@ const envSchema = z.object({
 
   ADMIN_API_KEY: z.string().default("change-me-admin-key"),
 
-  LOG_LEVEL: z.enum(["fatal", "error", "warn", "info", "debug", "trace", "silent"]).default("info")
+  LOG_LEVEL: z.enum(["fatal", "error", "warn", "info", "debug", "trace", "silent"]).default("info"),
+
+  // WhatsApp Business Cloud API adapter (src/channels/whatsapp/) — all
+  // optional so the app runs exactly as before when WhatsApp isn't
+  // configured. GET /api/v1/webhooks/whatsapp verification and outbound
+  // sends simply fail closed until these are set. Never hard-code these —
+  // see README.md → "WhatsApp integration".
+  WHATSAPP_VERIFY_TOKEN: z.string().optional(),
+  WHATSAPP_ACCESS_TOKEN: z.string().optional(),
+  WHATSAPP_PHONE_NUMBER_ID: z.string().optional(),
+  WHATSAPP_API_VERSION: z.string().default("v21.0")
 });
 
 const parsed = envSchema.safeParse(process.env);
