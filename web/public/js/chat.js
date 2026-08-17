@@ -1,6 +1,6 @@
 (() => {
-  const STORAGE_KEY = "alamdin_conversation_id";
-  const SOUND_KEY = "alamdin_sound_enabled";
+  const STORAGE_KEY = "skincenter_conversation_id";
+  const SOUND_KEY = "skincenter_sound_enabled";
 
   const chatScroll = document.getElementById("chatScroll");
   const emptyState = document.getElementById("emptyState");
@@ -19,7 +19,7 @@
   let lastRenderedDateKey = null;
 
   const SUMMARY_MARKERS = ["Appointment Request", "اپائنٹمنٹ کی درخواست"];
-  const RECEIVED_MARKERS = ["request has been received", "درخواست موصول ہو گئی ہے", "request receive ho gayi"];
+  const RECEIVED_MARKERS = ["request has been submitted", "درخواست جمع ہو گئی ہے", "request submit ho gayi"];
 
   function isSummary(text) {
     return SUMMARY_MARKERS.some((m) => text.includes(m)) && text.includes(":");
@@ -131,7 +131,7 @@
 
     const avatar = document.createElement("div");
     avatar.className = "msg-avatar";
-    avatar.textContent = "A";
+    avatar.textContent = "S";
 
     const col = document.createElement("div");
     col.className = "msg-col";

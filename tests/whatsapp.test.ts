@@ -124,7 +124,7 @@ describe("POST /api/v1/webhooks/whatsapp — end-to-end", () => {
     const [, options] = fetchMock.mock.calls[0];
     const sentBody = JSON.parse(options.body);
     expect(sentBody.to).toBe("923001112222");
-    expect(sentBody.text.body).toContain("500");
+    expect(sentBody.text.body).toContain("1,000");
   });
 
   it("sends the outbound message to the exact WhatsApp Cloud API endpoint with the configured token, never exposing it in the response", async () => {
@@ -225,13 +225,13 @@ describe("POST /api/v1/webhooks/whatsapp — end-to-end", () => {
 
     const [, options] = fetchMock.mock.calls[0];
     const sentBody = JSON.parse(options.body);
-    expect(sentBody.text.body).toContain("500");
+    expect(sentBody.text.body).toContain("1,000");
     expect(sentBody.text.body).not.toContain("10,000");
   });
 
   it("walks a WhatsApp patient through the full appointment request flow and never says 'Appointment Confirmed'", async () => {
     const from = "923301234567";
-    const turns = ["Mujhe appointment book karni hai", "Ahmed", "03301234567", "Daant mein dard hai", "Kal", "8 baje", "Yes"];
+    const turns = ["Mujhe appointment book karni hai", "Ahmed", "03301234567", "Acne ka masla hai", "Kal", "8 baje", "Yes"];
 
     for (let i = 0; i < turns.length; i++) {
       const res = await request(app).post("/api/v1/webhooks/whatsapp").send(textPayload(from, `wamid.APPT${i}`, turns[i]));
@@ -261,7 +261,7 @@ describe("POST /api/v1/webhooks/whatsapp — end-to-end", () => {
 
     const [, options] = fetchMock.mock.calls[0];
     const reply = JSON.parse(options.body).text.body as string;
-    expect(reply).toContain("500");
+    expect(reply).toContain("1,000");
 
     const contact = await prisma.whatsAppContact.findUnique({ where: { phoneNumber: from } });
     const conversation = await prisma.conversation.findUnique({ where: { id: contact!.conversationId } });

@@ -17,6 +17,7 @@ import { classifyIntent, detectSecondaryFactIntent, isAffirmative, isEmergency, 
 import { R, SUMMARY_LABELS, t } from "./responses";
 import { detectCorrection, detectImplicitValueChange } from "./correction";
 import { extractEmbeddedFields } from "./slotExtractor";
+import { findServiceByAlias } from "../config/clinic";
 import {
   applyFieldAnswer,
   detectFieldFromText,
@@ -86,7 +87,7 @@ function buildSummaryMessage(fields: AppointmentFields, language: Language): str
     "",
     `👤 ${labels.name}: ${fields.patientName ?? ""}`,
     `📱 ${labels.phone}: ${fields.phone ?? ""}`,
-    `🦷 ${labels.reason}: ${fields.reason ?? ""}`,
+    `🩺 ${labels.reason}: ${fields.reason ?? ""}`,
     `📅 ${labels.date}: ${dateLabel}`,
     `🕐 ${labels.time}: ${fields.preferredTimeNormalized ?? ""}`,
     "",
@@ -113,29 +114,27 @@ function fieldLabelFor(stage: Stage, language: Language): string {
   }
 }
 
-/** Answers a clinic-fact question layered onto another message — see detectSecondaryFactIntent. */
-function factReply(intent: FactIntent, language: Language): string {
+/** Answers a clinic-fact question layered onto another message — see detectSecondaryFactIntent. Takes the raw message too, since SERVICE_INQUIRY needs it to resolve which catalog entry matched. */
+function factReply(intent: FactIntent, language: Language, rawMessage: string): string {
   switch (intent) {
-    case "FEE":
-      return t(R.feeInfo, language);
-    case "HOURS_CLINIC":
-      return t(R.hoursInfo, language, "clinic");
-    case "HOURS_HOSPITAL":
-      return t(R.hoursInfo, language, "hospital");
-    case "HOURS_GENERAL":
-      return t(R.hoursInfo, language, "both");
+    case "SERVICE_INQUIRY": {
+      const service = findServiceByAlias(rawMessage);
+      return service ? t(R.serviceInfo, language, service) : t(R.servicesOverview, language);
+    }
+    case "SERVICES_OVERVIEW":
+      return t(R.servicesOverview, language);
+    case "CONSULTATION_FEE":
+      return t(R.consultationInfo, language);
+    case "HOURS":
+      return t(R.hoursInfo, language);
     case "LOCATION":
       return t(R.locationInfo, language);
     case "DOCTOR":
       return t(R.doctorInfo, language);
-    case "SERVICES":
-      return t(R.servicesInfo, language);
     case "CONTACT":
       return t(R.contactInfo, language);
     case "RATINGS":
       return t(R.ratingsInfo, language);
-    case "SOCIAL":
-      return t(R.socialInfo, language);
   }
 }
 
@@ -210,8 +209,12 @@ export async function processMessage(conversationId: string | undefined, rawMess
   const isCollecting = stage.startsWith("COLLECTING_");
   const primaryIntent = classifyIntent(message);
 
-  if (!isCollecting && primaryIntent === "SAFETY_CONCERN") {
-    reply = t(R.safetyDecline, language);
+  if (!isCollecting && primaryIntent === "SAFETY_MOLE_CANCER") {
+    reply = t(R.moleCancerDecline, language);
+  } else if (!isCollecting && primaryIntent === "SAFETY_TREATMENT_RECOMMENDATION") {
+    reply = t(R.treatmentRecommendationDecline, language);
+  } else if (!isCollecting && primaryIntent === "SAFETY_DIAGNOSIS") {
+    reply = t(R.diagnosisDecline, language);
   } else if (!isCollecting && isEmergency(message)) {
     reply = t(R.emergencyGuidance, language);
   } else if (!isCollecting && primaryIntent === "HUMAN_HANDOFF") {
@@ -246,7 +249,7 @@ export async function processMessage(conversationId: string | undefined, rawMess
         const next = nextCollectingStage(fields);
         stage = next;
         const secondaryFact = detectSecondaryFactIntent(message);
-        const factAnswer = secondaryFact ? `${factReply(secondaryFact, language)}\n\n` : "";
+        const factAnswer = secondaryFact ? `${factReply(secondaryFact, language, message)}\n\n` : "";
         reply = factAnswer + (next === "CONFIRMING_SUMMARY" ? buildSummaryMessage(fields, language) : promptForStage(next, language, fields));
         if (next === "CONFIRMING_SUMMARY") confirmationStatus = "PENDING";
       } else {
@@ -274,7 +277,7 @@ export async function processMessage(conversationId: string | undefined, rawMess
           const next = nextCollectingStage(fields);
           stage = next;
           const secondaryFact = detectSecondaryFactIntent(message);
-          const factAnswer = secondaryFact ? `${factReply(secondaryFact, language)}\n\n` : "";
+          const factAnswer = secondaryFact ? `${factReply(secondaryFact, language, message)}\n\n` : "";
           reply = ackPrefix + factAnswer + (next === "CONFIRMING_SUMMARY" ? buildSummaryMessage(fields, language) : promptForStage(next, language, fields));
           if (next === "CONFIRMING_SUMMARY") confirmationStatus = "PENDING";
         }
@@ -338,14 +341,14 @@ export async function processMessage(conversationId: string | undefined, rawMess
     switch (primaryIntent) {
       case "APPOINTMENT_TRIGGER": {
         // A trigger message can volunteer several fields at once, e.g.
-        // "Mera naam Ahmed hai aur mujhe kal 8 baje toothache ke liye
+        // "Mera naam Ahmed hai aur mujhe kal 8 baje Botox ke liye
         // appointment chahiye" — extract whatever's confidently there so
         // nextCollectingStage only asks for what's genuinely still missing.
         fields = fillMissingFields(fields, extractEmbeddedFields(message));
         const next = nextCollectingStage(fields);
         stage = next;
         const secondaryFact = detectSecondaryFactIntent(message);
-        const factAnswer = secondaryFact ? `${factReply(secondaryFact, language)}\n\n` : "";
+        const factAnswer = secondaryFact ? `${factReply(secondaryFact, language, message)}\n\n` : "";
         if (next === "CONFIRMING_SUMMARY") {
           confirmationStatus = "PENDING";
           reply = factAnswer + buildSummaryMessage(fields, language);
@@ -357,20 +360,19 @@ export async function processMessage(conversationId: string | undefined, rawMess
       case "HUMAN_HANDOFF":
         reply = t(R.humanHandoff, language);
         break;
-      case "SERVICES":
-        reply = t(R.servicesInfo, language);
+      case "SERVICE_INQUIRY": {
+        const service = findServiceByAlias(message);
+        reply = service ? t(R.serviceInfo, language, service) : t(R.servicesOverview, language);
         break;
-      case "FEE":
-        reply = t(R.feeInfo, language);
+      }
+      case "SERVICES_OVERVIEW":
+        reply = t(R.servicesOverview, language);
         break;
-      case "HOURS_CLINIC":
-        reply = t(R.hoursInfo, language, "clinic");
+      case "CONSULTATION_FEE":
+        reply = t(R.consultationInfo, language);
         break;
-      case "HOURS_HOSPITAL":
-        reply = t(R.hoursInfo, language, "hospital");
-        break;
-      case "HOURS_GENERAL":
-        reply = t(R.hoursInfo, language, "both");
+      case "HOURS":
+        reply = t(R.hoursInfo, language);
         break;
       case "LOCATION":
         reply = t(R.locationInfo, language);
@@ -383,9 +385,6 @@ export async function processMessage(conversationId: string | undefined, rawMess
         break;
       case "RATINGS":
         reply = t(R.ratingsInfo, language);
-        break;
-      case "SOCIAL":
-        reply = t(R.socialInfo, language);
         break;
       case "GREETING":
         reply = t(R.greeting, language);

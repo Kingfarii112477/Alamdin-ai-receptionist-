@@ -1,4 +1,4 @@
-import { CLINIC } from "../config/clinic";
+import { CLINIC, type CautionLevel, type ServiceEntry } from "../config/clinic";
 import type { Language } from "../types/conversation";
 
 type Templated = Record<Language, string>;
@@ -8,11 +8,13 @@ function pick(t: Templated, lang: Language): string {
   return t[lang];
 }
 
+const QUETTA = CLINIC.branches[0];
+
 export const R = {
   greeting: (): Templated => ({
-    english: `Assalam-o-Alaikum! Welcome to ${CLINIC.businessName}. How can I help you today?`,
-    urdu: `السلام علیکم! ${CLINIC.businessName} میں خوش آمدید۔ میں آپ کی کیا مدد کر سکتا ہوں؟`,
-    "roman-urdu": `Assalam-o-Alaikum! ${CLINIC.businessName} mein khush aamdeed. Main aapki kya madad kar sakta hoon?`
+    english: `Assalam-o-Alaikum! 👋 Welcome to ${CLINIC.businessName}. I'm the ${CLINIC.businessName} AI Receptionist. I can help with services, starting prices, clinic information, and appointment requests. How can I help you today?`,
+    urdu: `السلام علیکم! 👋 ${CLINIC.businessName} میں خوش آمدید۔ میں ${CLINIC.businessName} کا AI Receptionist ہوں۔ میں سروسز، ابتدائی قیمتوں، کلینک کی معلومات اور اپائنٹمنٹ ریکویسٹ میں مدد کر سکتا ہوں۔ میں آپ کی کیا مدد کر سکتا ہوں؟`,
+    "roman-urdu": `Assalam-o-Alaikum! 👋 ${CLINIC.businessName} mein khush aamdeed. Main ${CLINIC.businessName} ka AI Receptionist hoon. Main services, starting prices, clinic information aur appointment requests mein madad kar sakta hoon. Aap kis cheez mein madad chahte hain?`
   }),
 
   askName: (): Templated => ({
@@ -34,9 +36,9 @@ export const R = {
   }),
 
   askReason: (): Templated => ({
-    english: "Thanks. What's the reason for your visit?",
-    urdu: "شکریہ۔ آپ کس وجہ سے کلینک آنا چاہتے ہیں؟",
-    "roman-urdu": "Shukriya. Aap kis wajah se clinic visit karna chahte hain?"
+    english: "Thanks. What's the reason for your visit, or which concern/service is this for?",
+    urdu: "شکریہ۔ آپ کس وجہ سے یا کس مسئلے/سروس کے لیے آنا چاہتے ہیں؟",
+    "roman-urdu": "Shukriya. Aap kis wajah se ya kis concern/service ke liye aana chahte hain?"
   }),
 
   askDate: (): Templated => ({
@@ -76,9 +78,9 @@ export const R = {
   }),
 
   requestReceived: (): Templated => ({
-    english: `Thank you! Your appointment request has been received.\n\nOur team will contact you at ${CLINIC.phone} to confirm your requested date and time.\n\nNote: This is an appointment request, not a confirmed appointment.`,
-    urdu: `شکریہ! آپ کی اپائنٹمنٹ کی درخواست موصول ہو گئی ہے۔\n\nہماری ٹیم آپ کے مطلوبہ دن اور وقت کی تصدیق کے لیے ${CLINIC.phone} پر آپ سے رابطہ کرے گی۔\n\nنوٹ: یہ اپائنٹمنٹ کی درخواست ہے، کنفرم اپائنٹمنٹ نہیں۔`,
-    "roman-urdu": `Shukriya! Aapki appointment request receive ho gayi hai.\n\nHamari team aapke requested date aur time ko confirm karne ke liye aapse ${CLINIC.phone} par rabta karegi.\n\nNote: Yeh appointment request hai, confirmed appointment nahi.`
+    english: `Your appointment request has been submitted. ${CLINIC.businessName} staff will confirm the available time — our team will contact you at ${QUETTA.phone}.\n\nNote: This is an appointment request, not a confirmed appointment.`,
+    urdu: `آپ کی اپائنٹمنٹ کی درخواست جمع ہو گئی ہے۔ ${CLINIC.businessName} کا عملہ دستیاب وقت کی تصدیق کرے گا — ہماری ٹیم آپ سے ${QUETTA.phone} پر رابطہ کرے گی۔\n\nنوٹ: یہ اپائنٹمنٹ کی درخواست ہے، کنفرم اپائنٹمنٹ نہیں۔`,
+    "roman-urdu": `Aapki appointment request submit ho gayi hai. ${CLINIC.businessName} staff available time confirm karega — hamari team aapse ${QUETTA.phone} par rabta karegi.\n\nNote: Yeh appointment request hai, confirmed appointment nahi.`
   }),
 
   editWhichField: (): Templated => ({
@@ -99,82 +101,76 @@ export const R = {
     "roman-urdu": "Koi baat nahi, maine yeh appointment request cancel kar di hai. Jab chahein dobara start kar sakte hain."
   }),
 
-  feeInfo: (): Templated => ({
-    english: `Our consultation fee is PKR ${CLINIC.consultationFeePKR}.`,
-    urdu: `ہماری کنسلٹیشن فیس ${CLINIC.consultationFeePKR} روپے ہے۔`,
-    "roman-urdu": `Consultation fee PKR ${CLINIC.consultationFeePKR} hai.`
+  // --- Clinic facts (deterministic, verified-only) ---------------------------
+
+  consultationInfo: (): Templated => ({
+    english: `Consultation is listed ${CLINIC.consultation.priceLabel.replace("From ", "from ")}. ${CLINIC.consultation.description}`,
+    urdu: `کنسلٹیشن کی قیمت ${CLINIC.consultation.priceLabel} ہے۔ ${CLINIC.consultation.description}`,
+    "roman-urdu": `Consultation ${CLINIC.consultation.priceLabel.replace("From ", "")} se listed hai. ${CLINIC.consultation.description}`
   }),
 
-  hoursInfo: (which: "clinic" | "hospital" | "both"): Templated => {
-    const clinicLine = `${CLINIC.hours.privateClinic.label}: ${CLINIC.hours.privateClinic.days}, ${CLINIC.hours.privateClinic.time}`;
-    const hospitalLine = `${CLINIC.hours.jelaniHospital.label}: ${CLINIC.hours.jelaniHospital.days}, ${CLINIC.hours.jelaniHospital.time}`;
-    if (which === "clinic") {
-      return {
-        english: `Our clinic timings are ${CLINIC.hours.privateClinic.days}, ${CLINIC.hours.privateClinic.time}.`,
-        urdu: `کلینک کے اوقات ${CLINIC.hours.privateClinic.days}، ${CLINIC.hours.privateClinic.time} ہیں۔`,
-        "roman-urdu": `Clinic ke timings ${CLINIC.hours.privateClinic.days}, ${CLINIC.hours.privateClinic.time} hain.`
-      };
-    }
-    if (which === "hospital") {
-      return {
-        english: `At Jelani Hospital, Dr. Alamdin is available ${CLINIC.hours.jelaniHospital.days}, ${CLINIC.hours.jelaniHospital.time}.`,
-        urdu: `جیلانی ہسپتال میں ڈاکٹر علمدین ${CLINIC.hours.jelaniHospital.days}، ${CLINIC.hours.jelaniHospital.time} دستیاب ہوتے ہیں۔`,
-        "roman-urdu": `Jelani Hospital mein Dr. Alamdin ${CLINIC.hours.jelaniHospital.days}, ${CLINIC.hours.jelaniHospital.time} available hote hain.`
-      };
-    }
-    return {
-      english: `${clinicLine}\n${hospitalLine}`,
-      urdu: `پرائیویٹ کلینک: ${CLINIC.hours.privateClinic.days}، ${CLINIC.hours.privateClinic.time}\nجیلانی ہسپتال: ${CLINIC.hours.jelaniHospital.days}، ${CLINIC.hours.jelaniHospital.time}`,
-      "roman-urdu": `${clinicLine}\n${hospitalLine}`
-    };
-  },
+  /** Only the one verified fact (closing time) — never a fabricated weekly schedule. */
+  hoursInfo: (): Templated => ({
+    english: `${CLINIC.businessName} is currently listed as closing at ${CLINIC.hours.closingTimeVerified}. I don't have a verified full weekly schedule — please contact us at ${QUETTA.phone} or WhatsApp ${CLINIC.whatsappDisplay} to confirm timings for a specific day.`,
+    urdu: `${CLINIC.businessName} کے بند ہونے کا موجودہ وقت ${CLINIC.hours.closingTimeVerified} ہے۔ مکمل ہفتہ وار شیڈول تصدیق شدہ نہیں ہے — براہ کرم ${QUETTA.phone} یا واٹس ایپ ${CLINIC.whatsappDisplay} پر رابطہ کریں۔`,
+    "roman-urdu": `${CLINIC.businessName} filhaal ${CLINIC.hours.closingTimeVerified} par close listed hai. Mera paas verified weekly schedule nahi hai — kisi specific din ke liye ${QUETTA.phone} ya WhatsApp ${CLINIC.whatsappDisplay} par confirm kar lein.`
+  }),
 
   locationInfo: (): Templated => ({
-    english: `We're located at ${CLINIC.location.address}.`,
-    urdu: `ہمارا کلینک ${CLINIC.location.address} پر واقع ہے۔`,
-    "roman-urdu": `Hamara clinic ${CLINIC.location.address} par hai.`
+    english: `${CLINIC.businessName} is located at ${QUETTA.address}.`,
+    urdu: `${CLINIC.businessName} ${QUETTA.address} پر واقع ہے۔`,
+    "roman-urdu": `${CLINIC.businessName} ${QUETTA.address} par hai.`
   }),
 
-  doctorInfo: (): Templated => {
-    const quals = CLINIC.doctor.qualifications.join(", ");
-    return {
-      english: `${CLINIC.doctor.name} — ${quals}. ${CLINIC.doctor.experienceYears}+ years of experience.`,
-      urdu: `${CLINIC.doctor.name} — ${quals}۔ ${CLINIC.doctor.experienceYears} سال سے زائد کا تجربہ۔`,
-      "roman-urdu": `${CLINIC.doctor.name} — ${quals}. ${CLINIC.doctor.experienceYears}+ saal ka tajurba.`
-    };
-  },
+  doctorInfo: (): Templated => ({
+    english: `${CLINIC.doctor.name} — ${CLINIC.doctor.specialty}, ${CLINIC.doctor.positioning}.`,
+    urdu: `${CLINIC.doctor.name} — ${CLINIC.doctor.specialty}، ${CLINIC.doctor.positioning}۔`,
+    "roman-urdu": `${CLINIC.doctor.name} — ${CLINIC.doctor.specialty}, ${CLINIC.doctor.positioning}.`
+  }),
 
   contactInfo: (): Templated => ({
-    english: `You can reach us at ${CLINIC.phone} (also on WhatsApp: ${CLINIC.whatsappUrl}).`,
-    urdu: `آپ ہم سے ${CLINIC.phone} پر رابطہ کر سکتے ہیں (واٹس ایپ: ${CLINIC.whatsappUrl})۔`,
-    "roman-urdu": `Aap humse ${CLINIC.phone} par rabta kar sakte hain (WhatsApp: ${CLINIC.whatsappUrl}).`
+    english: `You can reach ${CLINIC.businessName} at ${QUETTA.phone}, WhatsApp ${CLINIC.whatsappDisplay}, or ${CLINIC.email} (${CLINIC.website}).`,
+    urdu: `آپ ${CLINIC.businessName} سے ${QUETTA.phone}، واٹس ایپ ${CLINIC.whatsappDisplay}، یا ${CLINIC.email} (${CLINIC.website}) پر رابطہ کر سکتے ہیں۔`,
+    "roman-urdu": `Aap ${CLINIC.businessName} se ${QUETTA.phone}, WhatsApp ${CLINIC.whatsappDisplay}, ya ${CLINIC.email} (${CLINIC.website}) par rabta kar sakte hain.`
   }),
 
   ratingsInfo: (): Templated => {
-    const list = CLINIC.ratings.map((r) => `${r.source}: ${r.score} (${r.detail})`).join(", ");
+    const list = CLINIC.ratings.map((r) => (r.score ? `${r.source}: ${r.score} (${r.detail})` : `${r.source}: ${r.detail}`)).join(", ");
     return {
-      english: `We're rated ${list}.`,
-      urdu: `ہماری ریٹنگز: ${list}۔`,
-      "roman-urdu": `Hamari ratings: ${list}.`
+      english: `${CLINIC.businessName} is rated ${list}.`,
+      urdu: `${CLINIC.businessName} کی ریٹنگز: ${list}۔`,
+      "roman-urdu": `${CLINIC.businessName} ki ratings: ${list}.`
     };
   },
 
-  socialInfo: (): Templated => ({
-    english: `Find us on Instagram (${CLINIC.social.instagram}), Facebook (${CLINIC.social.facebook}), and TikTok (${CLINIC.social.tiktok}).`,
-    urdu: `ہمیں انسٹاگرام (${CLINIC.social.instagram})، فیس بک (${CLINIC.social.facebook}) اور ٹک ٹاک (${CLINIC.social.tiktok}) پر تلاش کریں۔`,
-    "roman-urdu": `Humein Instagram (${CLINIC.social.instagram}), Facebook (${CLINIC.social.facebook}), aur TikTok (${CLINIC.social.tiktok}) par follow karein.`
+  // --- Safety ------------------------------------------------------------
+
+  /** Generic self-diagnosis refusal — e.g. "is this X condition?", "white patches, is this vitiligo?" */
+  diagnosisDecline: (): Templated => ({
+    english: `I can't diagnose a skin condition through chat. Symptoms like this can have different causes and should be assessed by a dermatologist. ${CLINIC.businessName} provides dermatological evaluation — I can help you request an appointment.`,
+    urdu: `میں چیٹ کے ذریعے جلد کی تشخیص نہیں کر سکتا۔ ایسی علامات مختلف وجوہات کی بنا پر ہو سکتی ہیں اور ماہر ڈرماٹولوجسٹ سے معائنہ ضروری ہے۔ میں آپ کی اپائنٹمنٹ درخواست میں مدد کر سکتا ہوں۔`,
+    "roman-urdu": `Main chat ke zariye skin condition ki diagnosis nahi kar sakta. Aisi symptoms ki different wajuhat ho sakti hain aur dermatologist se assess karwana zaroori hai. Main aapki appointment request mein madad kar sakta hoon.`
   }),
 
-  safetyDecline: (): Templated => ({
-    english: `I can't diagnose conditions or prescribe medication. Please book an in-clinic examination with the doctor for a proper assessment — call ${CLINIC.phone} to arrange it.`,
-    urdu: `میں تشخیص یا دوا تجویز نہیں کر سکتا/سکتی۔ براہ کرم درست معائنے کے لیے کلینک وزٹ کریں۔ اپائنٹمنٹ کے لیے ${CLINIC.phone} پر رابطہ کریں۔`,
-    "roman-urdu": `Main diagnosis nahi kar sakta/sakti. Aap apni symptoms ke saath clinic mein professional dental examination karwa sakte hain. Appointment ke liye ${CLINIC.phone} par rabta karein.`
+  /** A mole/growth being asked whether it's cancerous — never confirmed or denied through chat. */
+  moleCancerDecline: (): Templated => ({
+    english: "I can't determine whether a mole or skin growth is cancerous through chat. A dermatologist would need to examine it in person. I can help you request an appointment.",
+    urdu: `میں چیٹ کے ذریعے یہ تعین نہیں کر سکتا کہ کوئی تل یا نشان کینسر ہے یا نہیں۔ اس کے لیے ڈرماٹولوجسٹ کا معائنہ ضروری ہے۔ میں آپ کی اپائنٹمنٹ درخواست میں مدد کر سکتا ہوں۔`,
+    "roman-urdu": "Main chat ke zariye yeh determine nahi kar sakta ke koi mole ya skin growth cancerous hai ya nahi. Iske liye dermatologist ka in-person examination zaroori hai. Main aapki appointment request mein madad kar sakta hoon."
   }),
 
+  /** Asked to personally recommend/pick an injectable or specific treatment for the individual patient. */
+  treatmentRecommendationDecline: (): Templated => ({
+    english: "I can share what's listed for a treatment, but I can't personally recommend or select one for you — a dermatologist needs to assess whether it's suitable and safe for your case. I can help you request an appointment.",
+    urdu: `میں کسی علاج کے بارے میں معلومات دے سکتا ہوں، لیکن آپ کے لیے ذاتی طور پر کوئی علاج تجویز نہیں کر سکتا — یہ ڈرماٹولوجسٹ کا کام ہے۔ میں آپ کی اپائنٹمنٹ درخواست میں مدد کر سکتا ہوں۔`,
+    "roman-urdu": "Main kisi treatment ke baare mein listed information de sakta hoon, lekin aapke liye personally koi treatment recommend nahi kar sakta — dermatologist ko assess karna hota hai ke woh aapke liye suitable aur safe hai ya nahi. Main aapki appointment request mein madad kar sakta hoon."
+  }),
+
+  /** True medical emergencies (breathing difficulty, anaphylaxis, severe bleeding, eye injury...) — never a skin-clinic-appropriate response, never a fabricated number. */
   emergencyGuidance: (): Templated => ({
-    english: `That sounds like it needs urgent attention. Please seek immediate professional dental/medical care, or call us right away at ${CLINIC.phone} so we can guide you.`,
-    urdu: `یہ فوری توجہ کا معاملہ لگتا ہے۔ براہ کرم فوراً کسی ماہر ڈینٹل/میڈیکل ہیلپ سے رجوع کریں، یا ابھی ${CLINIC.phone} پر ہمیں کال کریں۔`,
-    "roman-urdu": `Yeh urgent lag raha hai. Baraye meharbani foran professional dental/medical help lein, ya abhi ${CLINIC.phone} par humein call karein.`
+    english: `That sounds like it needs urgent medical attention. Please seek immediate emergency medical care (your nearest emergency room) right away — this isn't something to wait on a clinic appointment for.`,
+    urdu: `یہ فوری طبی توجہ کا معاملہ لگتا ہے۔ براہ کرم فوراً قریب ترین ایمرجنسی سے رجوع کریں — اس کے لیے کلینک اپائنٹمنٹ کا انتظار نہ کریں۔`,
+    "roman-urdu": `Yeh urgent medical attention ka maamla lagta hai. Baraye meharbani foran apne nazdeeki emergency room se rujoo karein — iske liye clinic appointment ka intezar na karein.`
   }),
 
   appointmentAlreadySubmittedIntro: (): Templated => ({
@@ -191,27 +187,62 @@ export const R = {
   }),
 
   humanHandoff: (): Templated => ({
-    english: `I'll have our team reach out to you. You can also call us directly at ${CLINIC.phone}.`,
-    urdu: `ہماری ٹیم آپ سے رابطہ کرے گی۔ آپ براہ راست ${CLINIC.phone} پر بھی کال کر سکتے ہیں۔`,
-    "roman-urdu": `Hamari team aapse rabta karegi. Aap seedha ${CLINIC.phone} par bhi call kar sakte hain.`
+    english: `I'll have our team reach out to you. You can also call us directly at ${QUETTA.phone} or WhatsApp ${CLINIC.whatsappDisplay}.`,
+    urdu: `ہماری ٹیم آپ سے رابطہ کرے گی۔ آپ براہ راست ${QUETTA.phone} یا واٹس ایپ ${CLINIC.whatsappDisplay} پر بھی رابطہ کر سکتے ہیں۔`,
+    "roman-urdu": `Hamari team aapse rabta karegi. Aap seedha ${QUETTA.phone} ya WhatsApp ${CLINIC.whatsappDisplay} par bhi rabta kar sakte hain.`
   }),
 
   /** To reschedule an already-SUBMITTED request — the chat flow has no way to edit a persisted AppointmentRequest, so this points to staff by phone rather than pretending to handle it. */
   rescheduleInfo: (): Templated => ({
-    english: `To reschedule an already-submitted request, please call us at ${CLINIC.phone} and our team will help.`,
-    urdu: `پہلے سے جمع شدہ درخواست کو دوبارہ شیڈول کرنے کے لیے ${CLINIC.phone} پر کال کریں، ہماری ٹیم مدد کرے گی۔`,
-    "roman-urdu": `Pehle se submit ki gayi request reschedule karne ke liye ${CLINIC.phone} par call karein, hamari team madad karegi.`
+    english: `To reschedule an already-submitted request, please call us at ${QUETTA.phone} and our team will help.`,
+    urdu: `پہلے سے جمع شدہ درخواست کو دوبارہ شیڈول کرنے کے لیے ${QUETTA.phone} پر کال کریں، ہماری ٹیم مدد کرے گی۔`,
+    "roman-urdu": `Pehle se submit ki gayi request reschedule karne ke liye ${QUETTA.phone} par call karein, hamari team madad karegi.`
   }),
 
-  /** Sourced only from CLINIC.doctor.qualifications — never an invented services catalog. */
-  servicesInfo: (): Templated => {
-    const quals = CLINIC.doctor.qualifications.join(", ");
+  // --- Service catalog (data-driven — see src/config/clinic.ts) ----------
+
+  /** One verified service, with its price exactly as listed and a caution note appropriate to its category. Never invents a price. */
+  serviceInfo: (service: ServiceEntry): Templated => {
+    const caution = CAUTION_SUFFIX[service.caution];
+    const tech = service.technology ? ` (${service.technology})` : "";
+    if (service.priceType === "unverified") {
+      return {
+        english: `${CLINIC.businessName} lists ${service.canonicalName}${tech}. ${service.description} I don't have a verified current price for it — please contact us at ${QUETTA.phone} or WhatsApp ${CLINIC.whatsappDisplay} for the current price.`,
+        urdu: `${CLINIC.businessName} میں ${service.canonicalName}${tech} دستیاب ہے۔ ${service.description} اس کی تصدیق شدہ قیمت میرے پاس موجود نہیں — براہ کرم ${QUETTA.phone} یا واٹس ایپ ${CLINIC.whatsappDisplay} پر رابطہ کریں۔`,
+        "roman-urdu": `${CLINIC.businessName} mein ${service.canonicalName}${tech} listed hai. ${service.description} Iski verified current price mere paas nahi hai — please ${QUETTA.phone} ya WhatsApp ${CLINIC.whatsappDisplay} par contact karein.`
+      };
+    }
     return {
-      english: `Dr. Alamdin is certified in implants, veneers, root canal (endodontics), and crowns & bridges (${quals}). For anything not listed here, please call ${CLINIC.phone} to confirm.`,
-      urdu: `ڈاکٹر علمدین امپلانٹس، وینیئرز، روٹ کینال (اینڈوڈونٹکس)، اور کراؤن اینڈ برج میں سرٹیفائیڈ ہیں (${quals})۔ کسی اور سروس کی تصدیق کے لیے ${CLINIC.phone} پر کال کریں۔`,
-      "roman-urdu": `Dr. Alamdin implants, veneers, root canal (endodontics), aur crowns & bridges mein certified hain (${quals}). Kisi aur service ke baare mein ${CLINIC.phone} par call kar ke confirm kar lein.`
+      english: `${CLINIC.businessName} lists ${service.canonicalName} ${service.priceLabel!.replace("From ", "from ")}${tech}. ${service.description} ${caution.english}`,
+      urdu: `${CLINIC.businessName} میں ${service.canonicalName} کی قیمت ${service.priceLabel}${tech} ہے۔ ${service.description} ${caution.urdu}`,
+      "roman-urdu": `${CLINIC.businessName} mein ${service.canonicalName} ${service.priceLabel} listed hai${tech}. ${service.description} ${caution["roman-urdu"]}`
     };
-  }
+  },
+
+  servicesOverview: (): Templated => ({
+    english: `${CLINIC.businessName} offers medical dermatology, injectables (Botox, fillers, PRP), lasers, facial/aesthetic treatments, hair treatments, body contouring, and surgical procedures. Ask about a specific treatment (e.g. "Botox price") and I'll share the listed details.`,
+    urdu: `${CLINIC.businessName} میڈیکل ڈرماٹولوجی، انجیکٹیبلز (بوٹوکس، فلرز، پی آر پی)، لیزرز، فیشل/ایستھیٹک علاج، بالوں کے علاج، باڈی کونٹورنگ، اور سرجیکل طریقہ کار پیش کرتا ہے۔ کسی مخصوص علاج کے بارے میں پوچھیں۔`,
+    "roman-urdu": `${CLINIC.businessName} medical dermatology, injectables (Botox, fillers, PRP), lasers, facial/aesthetic treatments, hair treatments, body contouring, aur surgical procedures offer karta hai. Kisi specific treatment ke baare mein pooch lein (e.g. "Botox price") — main listed details bata dunga.`
+  })
+};
+
+const CAUTION_SUFFIX: Record<CautionLevel, Templated> = {
+  injectable: {
+    english: "The dermatologist will assess whether it's suitable and safe for you.",
+    urdu: "ڈرماٹولوجسٹ یہ جائزہ لیں گے کہ یہ آپ کے لیے موزوں اور محفوظ ہے یا نہیں۔",
+    "roman-urdu": "Dermatologist assess karenge ke yeh aapke liye suitable aur safe hai ya nahi."
+  },
+  surgical: {
+    english: "This needs a dermatologist consultation to confirm suitability — I can't provide procedural details.",
+    urdu: "اس کے لیے موزونیت کی تصدیق کے لیے ڈرماٹولوجسٹ سے مشاورت ضروری ہے۔",
+    "roman-urdu": "Iske liye suitability confirm karne ke liye dermatologist consultation zaroori hai — main procedural details nahi de sakta."
+  },
+  device: {
+    english: "Results vary by individual — the dermatologist can advise what's right for your skin.",
+    urdu: "نتائج ہر فرد کے لیے مختلف ہو سکتے ہیں — ڈرماٹولوجسٹ آپ کی جلد کے لیے مناسب رہنمائی کریں گے۔",
+    "roman-urdu": "Results har individual ke liye vary karte hain — dermatologist aapki skin ke liye sahi rehnumai karenge."
+  },
+  general: { english: "", urdu: "", "roman-urdu": "" }
 };
 
 export function t<T extends unknown[]>(fn: TemplatedFn<T>, lang: Language, ...args: T): string {
@@ -223,4 +254,3 @@ export const SUMMARY_LABELS: Record<Language, { name: string; phone: string; rea
   urdu: { name: "نام", phone: "فون", reason: "وجہ", date: "تاریخ", time: "وقت" },
   "roman-urdu": { name: "Naam", phone: "Phone", reason: "Reason", date: "Date", time: "Time" }
 };
-

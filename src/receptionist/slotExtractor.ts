@@ -1,4 +1,5 @@
 import { parseDateExpression, parseTimeExpression } from "../utils/dateTimeParser";
+import { findServiceByAlias } from "../config/clinic";
 import { parsePhone } from "./stateMachine";
 import type { AppointmentFields } from "./stateMachine";
 
@@ -26,43 +27,62 @@ export function extractNameFromText(text: string): string | null {
 }
 
 /**
- * Common dental-visit reasons, longest/most specific first so a fuller
- * phrase like "tooth mein pain" is preferred over a bare "pain" when both
- * are present. Used both to spot a reason embedded in a longer message and
- * (by the caller, on an already-negation-scoped substring) to read out a
- * corrected reason — see correction.ts.
+ * Symptom phrases a patient might describe without naming a specific listed
+ * service — stored as the patient's own words (never auto-labeled with a
+ * diagnosis, e.g. "white patches" is stored as-is, never turned into
+ * "vitiligo") so staff see exactly what was reported. Checked only after
+ * the service catalog itself finds no match.
  */
-const REASON_HINT_PHRASES = [
-  "daant mein dard",
-  "daant me dard",
-  "dant mein dard",
-  "dant me dard",
-  "tooth mein pain",
-  "tooth mein dard",
-  "mere tooth mein pain",
-  "tooth ache",
-  "toothache",
-  "tooth pain",
-  "root canal",
-  "check up",
+const SYMPTOM_REASON_PHRASES = [
   "checkup",
-  "cleaning",
-  "filling",
-  "extraction",
-  "nikalna",
-  "implant",
-  "crown",
-  "veneers",
-  "swelling",
-  "sensitivity",
-  "cavity",
-  "dard",
-  "pain"
+  "check up",
+  "consultation",
+  "hair fall",
+  "baal girna",
+  "baal jhurna",
+  "baal jhar",
+  "white patches",
+  "safed dhabbay",
+  "safed daagh",
+  "dark spots",
+  "kaale dhabbay",
+  "acne",
+  "keel muhasay",
+  "muhasay",
+  "pimples",
+  "rash",
+  "khujli",
+  "itching",
+  "wrinkles",
+  "jhuriyan",
+  "pigmentation",
+  "allergy",
+  "mole",
+  "til",
+  "scar",
+  "nishan",
+  "skin problem",
+  "skin issue",
+  "skin ka masla",
+  "skin"
 ];
 
+/**
+ * Prefers a specific listed service (from the verified catalog — see
+ * src/config/clinic.ts) when the message names one, e.g. "Mujhe Botox
+ * karwana hai" → "Botox consultation/treatment". Falls back to storing a
+ * described symptom in the patient's own words when no specific service is
+ * named. Used both to spot a reason embedded in a longer message and (by
+ * the caller, on an already-negation-scoped substring) to read out a
+ * corrected reason — see correction.ts.
+ */
 export function extractReasonFromText(text: string): string | null {
   const lower = text.toLowerCase();
-  for (const phrase of REASON_HINT_PHRASES) {
+
+  const service = findServiceByAlias(lower);
+  if (service) return `${service.canonicalName} consultation/treatment`;
+
+  for (const phrase of SYMPTOM_REASON_PHRASES) {
     if (lower.includes(phrase)) return phrase;
   }
   return null;

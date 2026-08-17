@@ -1,17 +1,19 @@
+import { findServiceByAlias } from "../config/clinic";
+
 export type Intent =
   | "APPOINTMENT_TRIGGER"
-  | "FEE"
-  | "HOURS_CLINIC"
-  | "HOURS_HOSPITAL"
-  | "HOURS_GENERAL"
+  | "SERVICE_INQUIRY"
+  | "SERVICES_OVERVIEW"
+  | "CONSULTATION_FEE"
+  | "HOURS"
   | "LOCATION"
   | "DOCTOR"
-  | "SERVICES"
   | "CONTACT"
   | "RATINGS"
-  | "SOCIAL"
   | "GREETING"
-  | "SAFETY_CONCERN"
+  | "SAFETY_MOLE_CANCER"
+  | "SAFETY_TREATMENT_RECOMMENDATION"
+  | "SAFETY_DIAGNOSIS"
   | "CANCEL"
   | "AFFIRM"
   | "DENY"
@@ -22,7 +24,7 @@ export type Intent =
 /** Deterministic-fact intents a message can carry ALONGSIDE another primary
  * intent (e.g. an appointment message that also asks the fee) — see
  * detectSecondaryFactIntent, used for multi-intent handling. */
-export type FactIntent = "FEE" | "HOURS_CLINIC" | "HOURS_HOSPITAL" | "HOURS_GENERAL" | "LOCATION" | "DOCTOR" | "SERVICES" | "CONTACT" | "RATINGS" | "SOCIAL";
+export type FactIntent = "SERVICE_INQUIRY" | "SERVICES_OVERVIEW" | "CONSULTATION_FEE" | "HOURS" | "LOCATION" | "DOCTOR" | "RATINGS" | "CONTACT";
 
 const SINGLE_WORD = /^[a-z0-9]+$/;
 const wordBoundaryCache = new Map<string, RegExp>();
@@ -92,34 +94,84 @@ const APPOINTMENT_WORDS = [
   "schedule",
   "milna hai",
   "milna",
-  "checkup",
-  "check up",
+  "consultation chahiye",
   "visit karna",
   "time chahiye",
   "aana hai",
-  // A patient describing a dental symptom unprompted is, in practice, asking
-  // to be seen — a real receptionist would move straight to booking rather
-  // than treat it as small talk. Kept to specific, distinctive phrases
-  // (not bare "pain"/"dard") to avoid over-triggering on unrelated text.
-  "tooth mein pain",
-  "tooth mein dard",
-  "daant mein dard",
-  "dant mein dard",
-  "toothache",
-  "tooth ache",
+  "karwana hai",
+  "karwani hai",
+  "lagwana hai",
+  "lagwani hai",
+  // A patient describing a skin/hair concern unprompted is, in practice,
+  // asking to be seen — a real receptionist would move straight to booking
+  // rather than treat it as small talk. Kept to specific, distinctive
+  // phrases (not bare "skin" or generic words) to avoid over-triggering.
+  "mera skin ka masla",
+  "meri skin ka masla",
+  "skin ka masla hai",
+  "baal bohat gir rahe",
+  "baal bahut gir rahe",
   "آپائنٹمنٹ",
   "اپائنٹمنٹ",
   "وقت لینا"
 ];
 
-const SAFETY_WORDS = [
+// A mole/growth explicitly asked whether it's cancerous — the highest-stakes
+// case, checked first and never left to a generic diagnosis response.
+const SAFETY_MOLE_CANCER_WORDS = [
+  "is this cancer",
+  "is it cancer",
+  "skin cancer",
+  "cancerous",
+  "mole cancer",
+  "cancer hai kya",
+  "kya yeh cancer hai",
+  "cancer to nahi",
+  "کینسر"
+];
+
+// The patient is asking the AI to personally pick/recommend a treatment for
+// them, rather than asking what's listed — that decision belongs to the
+// dermatologist, never the chatbot.
+const SAFETY_TREATMENT_RECOMMENDATION_WORDS = [
+  "should i take",
+  "should i get",
+  "which one should i",
+  "which is best for me",
+  "what should i take",
+  "what should i get",
+  "recommend me",
+  "suggest me a treatment",
+  "which treatment is best",
+  "mujhe kaunsa lena chahiye",
+  "mujhe konsa lena chahiye",
+  "kaunsa treatment lena chahiye",
+  "konsa treatment lena chahiye"
+];
+
+// General self-diagnosis requests — a symptom description asked as "what is
+// this" / "do I have X" rather than simply booking an appointment about it.
+const SAFETY_DIAGNOSIS_WORDS = [
   "diagnose",
   "diagnosis",
   "what disease",
   "which disease",
+  "what condition",
   "kya bimari",
   "konsi bimari",
   "bimari hai",
+  "is this vitiligo",
+  "do i have vitiligo",
+  "kya yeh vitiligo hai",
+  "kya mujhe vitiligo hai",
+  "is this psoriasis",
+  "do i have psoriasis",
+  "is this alopecia",
+  "do i have alopecia",
+  "white patches",
+  "safed dhabbay",
+  "safed daagh",
+  "is this normal",
   "prescribe",
   "prescription",
   "what medicine",
@@ -129,44 +181,59 @@ const SAFETY_WORDS = [
   "kya dawai",
   "kaunsi dawai",
   "antibiotic",
-  "tablet loon",
   "دوا",
   "تشخیص",
   "بیماری"
 ];
 
-const FEE_WORDS = ["fee", "fees", "price", "cost", "charges", "consultation fee", "kitne paise", "kitna paisa", "فیس", "قیمت"];
+const CONSULTATION_WORDS = [
+  "consultation fee",
+  "consultation price",
+  "consultation cost",
+  "doctor ki fee",
+  "doctor fee",
+  "doctor ka fee",
+  "checkup fee",
+  "visit fee",
+  "کنسلٹیشن فیس"
+];
 
-const HOURS_HOSPITAL_WORDS = ["hospital", "jelani", "جیلانی", "ہسپتال"];
-const HOURS_CLINIC_WORDS = ["clinic", "کلینک", "private clinic"];
-const HOURS_WORDS = ["timing", "timings", "hours", "open", "close", "kab khulta", "kab tak khula", "waqt milta", "اوقات", "ٹائمنگ", "کھلتا"];
+// Generic price wording with NO specific service named — checked only after
+// the service-catalog alias lookup, so "Botox kitna hai" resolves to the
+// specific Botox listing rather than this generic consultation fallback.
+const GENERIC_PRICE_WORDS = ["fee", "fees", "price", "cost", "charges", "kitne paise", "kitna paisa", "kitni hai", "kitna hai", "فیس", "قیمت"];
+
+const HOURS_WORDS = [
+  "timing",
+  "timings",
+  "hours",
+  "open",
+  "close",
+  "closes",
+  "kab khulta",
+  "kab tak khula",
+  "waqt milta",
+  "aaj open",
+  "khula hai",
+  "band karte",
+  "band hote",
+  "band hota",
+  "kitne baje band",
+  "kis waqt band",
+  "اوقات",
+  "ٹائمنگ",
+  "کھلتا"
+];
 
 const LOCATION_WORDS = ["location", "address", "kahan hai", "kaha hai", "where is", "map", "pata", "پتہ", "کہاں"];
 
-const DOCTOR_WORDS = ["doctor", "dr.", "dr ", "qualification", "degree", "experience", "kaun sa doctor", "ڈاکٹر"];
+const DOCTOR_WORDS = ["doctor", "dr.", "dr ", "dermatologist", "qualification", "specialist", "kaun sa doctor", "ڈاکٹر"];
 
-const SERVICES_WORDS = [
-  "services",
-  "service",
-  "treatments",
-  "procedures",
-  "root canal",
-  "implant",
-  "implants",
-  "veneer",
-  "veneers",
-  "crown",
-  "crowns",
-  "whitening",
-  "braces",
-  "خدمات"
-];
+const SERVICES_OVERVIEW_WORDS = ["services", "service", "treatments", "procedures", "what do you offer", "kya karte hain", "خدمات"];
 
-const CONTACT_WORDS = ["contact", "phone number", "whatsapp number", "call karo", "rabta", "رابطہ"];
+const CONTACT_WORDS = ["contact", "phone number", "whatsapp number", "call karo", "rabta", "email", "website", "رابطہ"];
 
 const RATINGS_WORDS = ["rating", "reviews", "review", "stars"];
-
-const SOCIAL_WORDS = ["instagram", "facebook", "tiktok", "social media"];
 
 const GREETING_WORDS = ["hi", "hello", "hey", "salam", "assalam", "aoa", "سلام"];
 
@@ -220,31 +287,30 @@ const AFFIRM_WORDS = [
 const DENY_WORDS = ["no", "nah", "nahi", "nahin", "not now", "wait", "rukain", "ruk jao", "نہیں"];
 
 /**
- * Deterministic, keyword-based intent classification. Facts (fee, hours,
- * location, doctor, contact) are ALWAYS matched here rather than left to the
- * AI, so a patient can never talk the receptionist into a wrong fact.
+ * Deterministic, keyword-based intent classification. Facts (services,
+ * prices, hours, location, doctor, contact) are ALWAYS matched here rather
+ * than left to the AI, so a patient can never talk the receptionist into a
+ * wrong fact — see src/config/clinic.ts for the verified source data.
  */
 export function classifyIntent(rawMessage: string): Intent {
   const text = rawMessage.toLowerCase();
 
-  if (matchesAny(text, SAFETY_WORDS)) return "SAFETY_CONCERN";
+  if (matchesAny(text, SAFETY_MOLE_CANCER_WORDS)) return "SAFETY_MOLE_CANCER";
+  if (matchesAny(text, SAFETY_TREATMENT_RECOMMENDATION_WORDS)) return "SAFETY_TREATMENT_RECOMMENDATION";
+  if (matchesAny(text, SAFETY_DIAGNOSIS_WORDS)) return "SAFETY_DIAGNOSIS";
   if (matchesAny(text, CANCEL_WORDS)) return "CANCEL";
   if (matchesAny(text, HUMAN_HANDOFF_WORDS)) return "HUMAN_HANDOFF";
   if (matchesAny(text, APPOINTMENT_WORDS) || fuzzyMatchesAny(text, APPOINTMENT_WORDS)) return "APPOINTMENT_TRIGGER";
-  if (matchesAny(text, FEE_WORDS)) return "FEE";
 
-  if (matchesAny(text, HOURS_WORDS)) {
-    if (matchesAny(text, HOURS_HOSPITAL_WORDS)) return "HOURS_HOSPITAL";
-    if (matchesAny(text, HOURS_CLINIC_WORDS)) return "HOURS_CLINIC";
-    return "HOURS_GENERAL";
-  }
-  if (matchesAny(text, HOURS_HOSPITAL_WORDS)) return "HOURS_HOSPITAL";
+  if (findServiceByAlias(text)) return "SERVICE_INQUIRY";
+  if (matchesAny(text, CONSULTATION_WORDS)) return "CONSULTATION_FEE";
+  if (matchesAny(text, GENERIC_PRICE_WORDS)) return "CONSULTATION_FEE";
 
+  if (matchesAny(text, HOURS_WORDS)) return "HOURS";
   if (matchesAny(text, LOCATION_WORDS)) return "LOCATION";
   if (matchesAny(text, DOCTOR_WORDS)) return "DOCTOR";
-  if (matchesAny(text, SERVICES_WORDS)) return "SERVICES";
+  if (matchesAny(text, SERVICES_OVERVIEW_WORDS)) return "SERVICES_OVERVIEW";
   if (matchesAny(text, RATINGS_WORDS)) return "RATINGS";
-  if (matchesAny(text, SOCIAL_WORDS)) return "SOCIAL";
   if (matchesAny(text, CONTACT_WORDS)) return "CONTACT";
   if (matchesAny(text, EDIT_WORDS)) return "EDIT_REQUEST";
   if (matchesAny(text, AFFIRM_WORDS)) return "AFFIRM";
@@ -255,12 +321,10 @@ export function classifyIntent(rawMessage: string): Intent {
 }
 
 const FACT_INTENT_CHECKS: { intent: FactIntent; words: string[] }[] = [
-  { intent: "FEE", words: FEE_WORDS },
   { intent: "LOCATION", words: LOCATION_WORDS },
   { intent: "DOCTOR", words: DOCTOR_WORDS },
-  { intent: "SERVICES", words: SERVICES_WORDS },
+  { intent: "SERVICES_OVERVIEW", words: SERVICES_OVERVIEW_WORDS },
   { intent: "RATINGS", words: RATINGS_WORDS },
-  { intent: "SOCIAL", words: SOCIAL_WORDS },
   { intent: "CONTACT", words: CONTACT_WORDS }
 ];
 
@@ -276,11 +340,11 @@ const FACT_INTENT_CHECKS: { intent: FactIntent; words: string[] }[] = [
  */
 export function detectSecondaryFactIntent(rawMessage: string): FactIntent | null {
   const text = rawMessage.toLowerCase();
-  if (matchesAny(text, HOURS_WORDS) || matchesAny(text, HOURS_HOSPITAL_WORDS)) {
-    if (matchesAny(text, HOURS_HOSPITAL_WORDS)) return "HOURS_HOSPITAL";
-    if (matchesAny(text, HOURS_CLINIC_WORDS)) return "HOURS_CLINIC";
-    return "HOURS_GENERAL";
-  }
+
+  if (findServiceByAlias(text)) return "SERVICE_INQUIRY";
+  if (matchesAny(text, CONSULTATION_WORDS) || matchesAny(text, GENERIC_PRICE_WORDS)) return "CONSULTATION_FEE";
+  if (matchesAny(text, HOURS_WORDS)) return "HOURS";
+
   for (const { intent, words } of FACT_INTENT_CHECKS) {
     if (matchesAny(text, words)) return intent;
   }
@@ -297,49 +361,51 @@ export function isNegative(rawMessage: string): boolean {
   return matchesAny(text, DENY_WORDS);
 }
 
+// True medical emergencies — never dermatology-clinic-appropriate;
+// these route to immediate emergency-care guidance, never a "call the
+// clinic" response. See src/receptionist/responses.ts → emergencyGuidance.
 const EMERGENCY_WORDS = [
   "emergency",
-  "severe pain",
-  "extreme pain",
-  "unbearable",
-  "bleeding a lot",
-  "heavy bleeding",
-  "uncontrolled bleeding",
-  "swelling badly",
-  "swollen badly",
-  "severe facial swelling",
-  "facial swelling",
   "difficulty breathing",
   "trouble breathing",
   "can't breathe",
   "cant breathe",
-  "difficulty swallowing",
-  "trouble swallowing",
-  "can't swallow",
-  "cant swallow",
-  "accident",
-  "major trauma",
-  "knocked out tooth",
-  "tooth knocked out",
-  "daant tut gaya",
-  "daant toot gaya",
-  "severe infection",
-  "pus",
-  "fever and swelling",
-  "bukhar aur soojan",
+  "saans lene mein mushkil",
+  "saans nahi aa rahi",
+  "allergic reaction",
+  "anaphylaxis",
+  "severe allergic reaction",
+  "shadeed allergy",
+  "unconscious",
+  "loss of consciousness",
+  "behosh",
+  "behoshi",
+  "uncontrolled bleeding",
+  "severe bleeding",
+  "heavy bleeding",
+  "bleeding a lot",
+  "khoon nahi ruk raha",
+  "zyada khoon",
+  "zyada bleeding",
+  "severe facial swelling",
+  "facial swelling",
+  "face is swelling badly",
+  "chehra soj gaya",
+  "eye injury",
+  "serious eye injury",
+  "aankh mein chot",
+  "aankh ki chot",
   "bohat dard",
   "bohot dard",
   "bahut dard",
-  "zyada khoon",
-  "zyada bleeding",
-  "khoon nahi ruk raha",
-  "sozish",
+  "unbearable",
   "ایمرجنسی",
-  "بہت درد",
+  "سانس",
+  "بے ہوش",
   "زیادہ خون"
 ];
 
-/** Detects language suggesting a dental emergency, to trigger urgent-care guidance. */
+/** Detects language suggesting a true medical emergency, to trigger urgent-care guidance. */
 export function isEmergency(rawMessage: string): boolean {
   const text = rawMessage.toLowerCase();
   return matchesAny(text, EMERGENCY_WORDS);

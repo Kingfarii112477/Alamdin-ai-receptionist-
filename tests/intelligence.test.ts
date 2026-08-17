@@ -1,6 +1,7 @@
 import { describe, expect, it } from "vitest";
 import request from "supertest";
 import { app } from "./testApp";
+import { CLINIC } from "../src/config/clinic";
 
 async function chat(message: string, conversationId?: string) {
   const res = await request(app).post("/api/v1/chat").send({ conversationId, message });
@@ -10,13 +11,19 @@ async function chat(message: string, conversationId?: string) {
 
 describe("Smart slot extraction — multiple fields in one message", () => {
   it("extracts name, reason, date, and time from a single trigger message, asking only for what's missing", async () => {
-    const r = await chat("Mera naam Ahmed hai aur mujhe kal 8 baje toothache ke liye appointment chahiye.");
+    const r = await chat("Mera naam Ahmed hai aur mujhe kal 8 baje acne ke liye appointment chahiye.");
     expect(r.state.name).toBe("Ahmed");
-    expect(r.state.reason).toBe("toothache");
+    expect(r.state.reason).toBe("acne");
     expect(r.state.preferredTime).toBe("8:00 PM");
     expect(r.state.stage).toBe("COLLECTING_PHONE");
     // Never re-asks for a field already given.
     expect(r.message.toLowerCase()).not.toMatch(/naam|name/);
+  });
+
+  it("extracts a specific listed service as the reason, not a generic word", async () => {
+    const r = await chat("Mera naam Hina hai aur mujhe Botox karwana hai.");
+    expect(r.state.name).toBe("Hina");
+    expect(r.state.reason).toMatch(/Botox/);
   });
 
   it("still asks one field at a time when nothing extra was volunteered", async () => {
@@ -32,7 +39,7 @@ describe("Correction intelligence", () => {
     const cid = r1.conversationId;
     await chat("Ahmed", cid);
     await chat("03301234567", cid);
-    await chat("checkup", cid);
+    await chat("acne", cid);
     await chat("kal", cid);
     const atSummary = await chat("8 baje", cid);
     expect(atSummary.state.stage).toBe("CONFIRMING_SUMMARY");
@@ -71,8 +78,8 @@ describe("Correction intelligence", () => {
     const cid = r1.conversationId;
     await chat("Sara", cid);
     await chat("03001112222", cid);
-    await chat("cleaning", cid);
-    const corrected = await chat("reason cleaning nahi checkup hai", cid);
+    await chat("acne", cid);
+    const corrected = await chat("reason acne nahi checkup hai", cid);
     expect(corrected.state.reason).toBe("checkup");
   });
 
@@ -81,7 +88,7 @@ describe("Correction intelligence", () => {
     const cid = r1.conversationId;
     await chat("Sara", cid);
     await chat("03001112222", cid);
-    await chat("cleaning", cid);
+    await chat("acne", cid);
     const withKal = await chat("kal", cid);
     const kalIso = withKal.state.preferredDate;
     const corrected = await chat("sorry, kal nahi parson", cid);
@@ -93,7 +100,7 @@ describe("Correction intelligence", () => {
     const cid = r1.conversationId;
     await chat("Sara", cid);
     await chat("03001112222", cid);
-    await chat("cleaning", cid);
+    await chat("acne", cid);
     await chat("kal", cid);
     const withTime = await chat("8 baje", cid);
     expect(withTime.state.preferredTime).toBe("8:00 PM");
@@ -117,7 +124,7 @@ describe("Context memory — never re-asks an already-known field", () => {
     await chat("Ahmed", cid);
     const r3 = await chat("03301234567", cid);
     expect(r3.message.toLowerCase()).not.toMatch(/naam|name/);
-    const r4 = await chat("Daant mein dard hai", cid);
+    const r4 = await chat("Meri skin mein masla hai", cid);
     expect(r4.message.toLowerCase()).not.toMatch(/naam|name|phone/);
   });
 });
@@ -186,9 +193,9 @@ describe("Smart time understanding", () => {
 });
 
 describe("Multi-intent handling — FAQ answered without losing appointment state", () => {
-  it("answers the fee question and still asks for the next appointment field", async () => {
+  it("answers the consultation fee question and still asks for the next appointment field", async () => {
     const r = await chat("Appointment kal chahiye, waise consultation fee kitni hai?");
-    expect(r.message).toContain("500");
+    expect(r.message).toContain("1,000");
     expect(r.state.stage).toBe("COLLECTING_NAME");
   });
 
@@ -199,9 +206,19 @@ describe("Multi-intent handling — FAQ answered without losing appointment stat
     await chat("03301234567", cid);
     await chat("checkup", cid);
     const r2 = await chat("kal, waise clinic kahan hai?", cid);
-    expect(r2.message).toMatch(/Zain Business Center|Zarghoon/);
+    expect(r2.message).toMatch(/Jinnah Road|Quarry Road/);
     expect(r2.state.stage).toBe("COLLECTING_TIME");
     expect(r2.state.preferredDate).toBeTruthy();
+  });
+
+  it("answers a Botox price question mid-collection and still records the reason being answered", async () => {
+    const r1 = await chat("appointment chahiye");
+    const cid = r1.conversationId;
+    await chat("Ahmed", cid);
+    await chat("03301234567", cid);
+    const r2 = await chat("Botox, waise iski price kya hai?", cid);
+    expect(r2.message).toContain("18,000");
+    expect(r2.state.stage).toBe("COLLECTING_DATE");
   });
 });
 
@@ -239,14 +256,14 @@ describe("Human handoff", () => {
     "responds with clinic contact info for '%s' without pretending a human was contacted",
     async (msg) => {
       const r = await chat(msg);
-      expect(r.message).toMatch(/0330-3786289/);
+      expect(r.message).toContain(CLINIC.branches[0].phone);
       expect(r.message.toLowerCase()).not.toMatch(/connected you|i have contacted|transferring you now/);
     }
   );
 });
 
 describe("Expanded emergency safety", () => {
-  it.each(["severe facial swelling", "difficulty breathing", "uncontrolled bleeding", "mera daant toot gaya hai"])(
+  it.each(["severe facial swelling", "difficulty breathing", "uncontrolled bleeding", "serious eye injury"])(
     "gives urgent-care guidance for '%s' without diagnosing or claiming emergency services were contacted",
     async (msg) => {
       const r = await chat(msg);
@@ -264,7 +281,7 @@ describe("Typo tolerance", () => {
 });
 
 describe("Mixed Urdu + English and Roman Urdu phrasing", () => {
-  it.each(["doctor se milna hai", "checkup karwana hai", "mere tooth mein pain hai"])(
+  it.each(["doctor se milna hai", "checkup karwana hai", "baal bohat gir rahe hain"])(
     "recognizes '%s' as wanting an appointment",
     async (msg) => {
       const r = await chat(msg);
@@ -273,11 +290,17 @@ describe("Mixed Urdu + English and Roman Urdu phrasing", () => {
   );
 });
 
-describe("Services intent — deterministic, sourced only from clinic data", () => {
-  it("answers a root canal / implants question from doctor qualifications, not an invented catalog", async () => {
-    const r = await chat("kya aap root canal karte hain?");
-    expect(r.message).toMatch(/root canal/i);
-    expect(r.message).toContain("C-Endo");
+describe("Service intent — deterministic, sourced only from clinic data", () => {
+  it("answers a Botox price question from the verified catalog, not an invented price", async () => {
+    const r = await chat("Botox kitne ka hai?");
+    expect(r.message).toMatch(/Botox/i);
+    expect(r.message).toContain("18,000");
+  });
+
+  it("never invents a price for a service with no verified price", async () => {
+    const r = await chat("Hair transplant kitne ka hai?");
+    expect(r.message).not.toMatch(/PKR \d/);
+    expect(r.message.toLowerCase()).toMatch(/verified|contact/);
   });
 });
 
@@ -302,7 +325,7 @@ describe("Database safety — no duplicate appointment requests", () => {
   });
 
   it("never produces the phrase 'Appointment Confirmed' anywhere in a full booking flow", async () => {
-    const r1 = await chat("Mera naam Hina hai aur mujhe kal 9 baje cleaning ke liye appointment chahiye.");
+    const r1 = await chat("Mera naam Hina hai aur mujhe kal 9 baje Botox ke liye appointment chahiye.");
     const cid = r1.conversationId;
     const messages = [r1.message];
     messages.push((await chat("03211234567", cid)).message);

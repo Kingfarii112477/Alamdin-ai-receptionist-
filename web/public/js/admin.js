@@ -1,5 +1,5 @@
 (() => {
-  const KEY_STORAGE = "alamdin_admin_key";
+  const KEY_STORAGE = "skincenter_admin_key";
 
   const gateScreen = document.getElementById("gateScreen");
   const dashboard = document.getElementById("dashboard");

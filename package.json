@@ -1,7 +1,7 @@
 {
   "name": "alamdin-ai-receptionist",
   "version": "1.0.0",
-  "description": "Portable AI receptionist backend for Dr. Alamdin Microscopic Dental Clinic and Implant Center",
+  "description": "Portable AI receptionist backend for Skin Center — Dr. Syed Bilal Shams, Quetta",
   "private": true,
   "type": "commonjs",
   "engines": {

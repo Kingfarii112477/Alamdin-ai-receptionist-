@@ -59,8 +59,8 @@ function extractForStage(
 
 /**
  * Detects whether a message is correcting a previously-provided appointment
- * field ("actually mera naam Bilal hai", "8 nahi 9 baje", "reason toothache
- * nahi cleaning hai") and, if so, which field and to what value. Returns
+ * field ("actually mera naam Bilal hai", "8 nahi 9 baje", "reason Botox
+ * nahi PRP hai") and, if so, which field and to what value. Returns
  * null for anything that isn't a recognizable correction — callers fall
  * through to their normal handling in that case, so a message that was
  * never meant as a correction is never misread as one.

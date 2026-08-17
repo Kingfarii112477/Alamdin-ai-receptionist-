@@ -504,14 +504,14 @@ body {
   max-width: 460px;
 }
 
-.tooth-hero {
+.brand-hero {
   position: relative;
   width: 220px;
   height: 170px;
   margin: 0 auto 8px;
 }
 
-.tooth-hero-orbit {
+.brand-hero-orbit {
   position: absolute;
   top: 0;
   left: 0;
@@ -527,15 +527,15 @@ body {
   }
 }
 
-.tooth-hero-glow {
+.brand-hero-glow {
   position: absolute;
   top: 24px;
   left: 50px;
   filter: drop-shadow(0 0 22px rgba(109, 91, 247, 0.45)) drop-shadow(0 0 44px rgba(111, 216, 255, 0.3));
-  animation: toothFloat 5s ease-in-out infinite;
+  animation: brandFloat 5s ease-in-out infinite;
 }
 
-@keyframes toothFloat {
+@keyframes brandFloat {
   0%,
   100% {
     transform: translateY(0);
